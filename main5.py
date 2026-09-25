@@ -15,6 +15,18 @@ things the console did not have:
   verify and a non-destructive restore. On the administrator's new
   *Data & Backup* tab.
 
+Two contextual-intelligence features sit on top of the analysis:
+
+* **Asset Safety Memory** (:mod:`sif.assets`) - every asset's incidents, near
+  misses, hazards, control failures, SIF precursors and corrective actions;
+  each new report is read against it for recurring hazards, repeated control
+  failures and emerging precursor patterns. An *Asset Memory* tab in the HSE
+  workspace, and a panel in every review case.
+* **Work-Hold Recommendation** (:mod:`sif.workhold`) - Continue, HSE Review
+  Required or Work-Hold Recommended for every report, with the factors behind
+  it; holds lead Home, have their own review filter, and are written to the
+  audit log when first raised.
+
 And the local LLM is always on: ``gemma2:latest`` through Ollama, attached at
 start-up, shown as a button in the title row that says whether it answers.
 """
@@ -30,10 +42,12 @@ from PyQt6.QtCore import QTimer
 from PyQt6.QtWidgets import QApplication
 
 from main2 import requires
-from main4 import ADMIN_TABS, WorkspaceWindow
+from main4 import ADMIN_TABS, HSE_TABS, WorkspaceWindow
 from sif import backup, prefs
-from sif.accounts import CONFIGURE, AccountStore, Session
+from sif.accounts import ANALYSE, CONFIGURE, AccountStore, Session
 from sif.actions import ComplianceAction
+from sif.assets import AssetMemory
+from sif.workhold import HOLD, Recommendation, recommend
 from sif.datastore import DataStore, default_url, describe_url
 from sif.llm import DEFAULT_HOST, OllamaEngine
 from sif.review import ReviewDecision, fingerprint
@@ -42,13 +56,14 @@ from sif.vectorstore import VectorStore
 from ui4.admin_wiring import setting
 from ui4.present import stamp, weekly_table
 from ui5.actions import SentraActions
+from ui5.assets import KIND_LABEL, LEVEL_TONE, AssetMemoryPage
 from ui5.dashboard import VIOLET, SentraDashboard
 from ui5.data import DataPage
 from ui5.llm import LLMButton
 from ui5.review import SentraReview
 from ui5.tasks import Task
 
-__all__ = ["SentraWindow", "SENTRA_ADMIN_TABS", "LLM_MODEL", "row_fingerprint"]
+__all__ = ["SentraWindow", "SENTRA_ADMIN_TABS", "SENTRA_HSE_TABS", "LLM_MODEL", "row_fingerprint"]
 
 #: The model SENTRA keeps switched on.
 LLM_MODEL = "gemma2:latest"
@@ -57,6 +72,8 @@ LLM_RECHECK_S = 120
 #: Minutes between looks at whether a scheduled backup is owed.
 BACKUP_CHECK_MIN = 15
 
+SENTRA_HSE_TABS = tuple(tab for tab in HSE_TABS if tab[0] != "profile") + (
+    ("assets", "Asset Memory"), ("profile", "Profile"))
 SENTRA_ADMIN_TABS = tuple(tab for tab in ADMIN_TABS if tab[0] != "profile") + (
     ("data", "Data && Backup"), ("profile", "Profile"))
 
@@ -121,6 +138,10 @@ class SentraWindow(WorkspaceWindow):
                  datastore: Optional[DataStore] = None, vault: Optional[Vault] = None,
                  load_on_start: Optional[bool] = None, probe_llm: bool = True) -> None:
         self._tasks: Dict[str, Task] = {}
+        self.asset_memory = AssetMemory()
+        self.recommendations: Dict[str, Recommendation] = {}
+        self._memory_dirty = True
+        self._holds_raised: Optional[set] = None
         self._llm_state = "checking"
         self.vault = vault or Vault()
         self._db_error = ""
@@ -160,7 +181,7 @@ class SentraWindow(WorkspaceWindow):
 
     @property
     def tabs(self):
-        return SENTRA_ADMIN_TABS if self.workspace == "admin" else super().tabs
+        return SENTRA_ADMIN_TABS if self.workspace == "admin" else SENTRA_HSE_TABS
 
     def _build_shell(self) -> None:
         super()._build_shell()
@@ -180,6 +201,14 @@ class SentraWindow(WorkspaceWindow):
         if self.workspace == "admin":
             self.data_page = self._build_data_page()
             self._page_index["data"] = self.pages.addWidget(self.data_page)
+        else:
+            self.assets_page = self._build_assets_page()
+            self._page_index["assets"] = self.pages.addWidget(self.assets_page)
+        review = self.review_page
+        review.recommendation.action_requested.connect(
+            lambda reference: self.add_action(reference=reference))
+        review.memory.asset_requested.connect(self.open_asset)
+        review.memory.report_requested.connect(self.open_case)
 
     def _apply_identity(self) -> None:
         super()._apply_identity()
@@ -192,6 +221,8 @@ class SentraWindow(WorkspaceWindow):
         super().navigate(key)
         if key == "data" and self.workspace == "admin" and self._shell_ready:
             self._refresh_data_page()
+        elif key == "assets" and self._shell_ready and hasattr(self, "assets_page"):
+            self._refresh_assets_page()
 
     def _refresh_dashboard(self) -> None:
         super()._refresh_dashboard()
@@ -322,6 +353,209 @@ class SentraWindow(WorkspaceWindow):
         super().change_encoder(backend)
         self._gate_llm()
 
+    # -- Asset Safety Memory and Work-Hold Recommendation ---------------------------------
+
+    def _refresh(self, *args, **kwargs):
+        # Reports, decisions and actions may have changed: the memory is rebuilt
+        # the next time anything reads it.
+        self._memory_dirty = True
+        return super()._refresh(*args, **kwargs)
+
+    def _decision_by_reference(self) -> Dict[str, str]:
+        standing = self.decisions.current()
+        found = {}
+        for row in self.rows:
+            entry = standing.get(row_fingerprint(row))
+            if entry is not None:
+                found[str(row.get("reference") or "")] = entry.decision
+        return found
+
+    def memory(self) -> AssetMemory:
+        """Every asset's history, with a recommendation for every report."""
+        if self._memory_dirty:
+            self._memory_dirty = False
+            decisions = self._decision_by_reference()
+            actions = getattr(self, "actions", None)
+            self.asset_memory = AssetMemory().build(
+                self.rows, decisions, actions.actions if actions is not None else ())
+            self.recommendations = {}
+            for row in self.rows:
+                reference = str(row.get("reference") or "")
+                if reference:
+                    self.recommendations[reference] = recommend(
+                        row, self.asset_memory.context(reference), decisions.get(reference, ""))
+            self._raise_holds()
+        return self.asset_memory
+
+    def recommendation(self, reference: str) -> Optional[Recommendation]:
+        self.memory()
+        return self.recommendations.get(str(reference))
+
+    def _raise_holds(self) -> None:
+        """Write each new work-hold recommendation to the audit log, once."""
+        if self._holds_raised is None:
+            self._holds_raised = {str((row.get("detail") or {}).get("reference", ""))
+                                  for row in self.audit.rows(limit=0)
+                                  if row.get("action") == "work-hold recommended"}
+        for reference, rec in self.recommendations.items():
+            if rec.level == HOLD and not rec.decision and reference not in self._holds_raised:
+                self._holds_raised.add(reference)
+                self.audit.system("work-hold recommended", reference=reference,
+                                  asset=self.asset_memory.context(reference).asset or None,
+                                  reason=(rec.reasons[0] if rec.reasons else "")[:200],
+                                  score=rec.score, routed_to="HSE review")
+
+    def holds(self) -> List[str]:
+        """References with a work-hold recommendation no person has decided yet."""
+        self.memory()
+        rows = {str(row.get("reference")): row for row in self.rows}
+        return sorted((reference for reference, rec in self.recommendations.items()
+                       if rec.level == HOLD and not rec.decision),
+                      key=lambda reference: (-self.recommendations[reference].score,
+                                             -float(rows.get(reference, {}).get("risk_score")
+                                                    or 0)))
+
+    def asset_snapshot(self) -> List[Dict[str, object]]:
+        memory = self.memory()
+        holds = set(self.holds())
+        snapshot = []
+        for history in memory.assets():
+            summary = history.summary()
+            summary["signal_list"] = [signal.to_dict() for signal in history.signals]
+            summary["equipment"] = list(history.equipment)
+            summary["holds"] = sum(1 for record in history.records
+                                   if record.reference in holds)
+            snapshot.append(summary)
+        return snapshot
+
+    def hold_snapshot(self) -> List[Dict[str, object]]:
+        memory = self.memory()
+        return [{**rec.to_dict(), "reference": reference,
+                 "asset": memory.context(reference).asset}
+                for reference, rec in self.recommendations.items()]
+
+    def open_asset(self, name: str) -> None:
+        if not hasattr(self, "assets_page"):
+            return
+        self.navigate("assets")
+        if name:
+            self.assets_page.select(name)
+
+    def _case_rows(self) -> List[Dict[str, object]]:
+        cases = super()._case_rows()
+        self.memory()
+        for case in cases:
+            rec = self.recommendations.get(str(case.get("reference")))
+            case["recommendation"] = rec.level if rec else ""
+            if rec is not None and rec.level == HOLD and "open" in case["_in"]:
+                case["_in"] = tuple(case["_in"]) + ("hold",)
+                case["trigger"] = f"Work-hold · {case.get('trigger', '')}"
+        # Holds first, in the order the queue had them.
+        cases.sort(key=lambda case: 0 if "hold" in case["_in"] else 1)
+        return cases
+
+    def _refresh_review_page(self) -> None:
+        super()._refresh_review_page()
+        page = self.review_page
+        page.set_counts({key: sum(1 for case in page.rows if key in case.get("_in", ()))
+                         for key, _label in page.filters})
+
+    def _show_case(self, reference: str) -> None:
+        super()._show_case(reference)
+        page = self.review_page
+        rec = self.recommendation(reference) if reference else None
+        page.recommendation.show_recommendation(reference, rec,
+                                                can_act=self.session.can(ANALYSE))
+        memory = self.memory()
+        context = memory.context(reference) if reference else None
+        page.memory.show_context(context, memory.get(context.asset) if context else None)
+
+    def _attention(self, critical, by_ref, now):
+        items = super()._attention(critical, by_ref, now)
+        holds = self.holds()
+        if not holds:
+            return items
+        memory = self.memory()
+        lead = []
+        for reference in holds[:4]:
+            rec = self.recommendations[reference]
+            asset = memory.context(reference).asset
+            lead.append(("critical", f"{reference} · Work-Hold Recommended.",
+                         (rec.reasons[0][:1].upper() + rec.reasons[0][1:] if rec.reasons
+                          else "") + (f" at {asset}" if asset else "") + "."
+                         + (" The report says the work was stopped." if rec.work_stopped
+                            else ""),
+                         "Review case", "review", reference))
+        if len(holds) > 4:
+            lead.append(("critical", f"{len(holds) - 4} more work holds.",
+                         "Each is waiting in HSE Review under the Work-hold filter.",
+                         "Open work holds", "review", holds[4]))
+        shown = set(holds)
+        rest = [item for item in items if not (item[4] == "review" and item[5] in shown)]
+        return lead + rest
+
+    def _build_assets_page(self) -> AssetMemoryPage:
+        page = AssetMemoryPage()
+        page.asset_selected.connect(self._show_asset)
+        page.report_requested.connect(self.open_case)
+        return page
+
+    def _refresh_assets_page(self) -> None:
+        memory = self.memory()
+        holds = set(self.holds())
+        rows = []
+        for history in memory.assets():
+            summary = history.summary()
+            high = summary["high_signals"]
+            rows.append({
+                "asset": history.name, "reports": summary["reports"],
+                "precursors": summary["precursors"],
+                "signal": (f"{high} high · {summary['signals']}", "fail") if high
+                else ((f"{summary['signals']} signal(s)", "warn") if summary["signals"]
+                      and any(signal.severity != "low" for signal in history.signals)
+                      else ("Quiet", "grey")),
+                "signals": sum(1 for signal in history.signals if signal.severity != "low"),
+                "holds": sum(1 for record in history.records if record.reference in holds),
+                "open_actions": summary["open_actions"], "last": summary["last"]})
+        page = self.assets_page
+        page.set_assets(rows)
+        kinds = {"recurring hazard": 0, "repeated control failure": 0,
+                 "emerging SIF precursor": 0}
+        for history in memory.assets():
+            for kind in kinds:
+                kinds[kind] += int(any(signal.kind == kind for signal in history.signals))
+        page.set_stats((
+            (len(rows), f"{len(self.rows)} report(s) placed", False),
+            (kinds["recurring hazard"], "assets, last 90 days", False),
+            (kinds["repeated control failure"], "assets, last 90 days",
+             bool(kinds["repeated control failure"])),
+            (kinds["emerging SIF precursor"], "assets", bool(kinds["emerging SIF precursor"])),
+            (len(holds), "awaiting an HSE decision", bool(holds))))
+
+    def _show_asset(self, name: str) -> None:
+        memory = self.memory()
+        history = memory.get(name) if name else None
+        timeline = []
+        if history is not None:
+            for record in reversed(history.records):
+                rec = self.recommendations.get(record.reference)
+                timeline.append({
+                    "when": record.when.strftime("%d %b %y") if record.when else "-",
+                    "reference": record.reference,
+                    "kind_label": KIND_LABEL.get(record.kind, record.kind),
+                    "risk_score": record.risk,
+                    "failure": record.failures[0] if record.failures else "-",
+                    "recommendation": (rec.label, LEVEL_TONE[rec.level]) if rec else ("", "grey")})
+        self.assets_page.show_asset(history, timeline)
+
+    def open_case(self, reference: str = "") -> None:
+        """A reference from the memory: its case if it is queued, else its report."""
+        queued = {str(row.get("reference")) for row in self._case_rows()} if reference else set()
+        if reference and reference not in queued:
+            self.open_report(reference)
+            return
+        super().open_case(reference)
+
     # -- the SQL database ----------------------------------------------------------------
 
     def _database_url(self) -> str:
@@ -346,6 +580,8 @@ class SentraWindow(WorkspaceWindow):
             "decisions": [entry.to_dict() for entry in self.decisions.entries],
             "actions": [action.to_dict() for action in self.actions.actions],
             "audit": self.audit.rows(limit=0),
+            "assets": self.asset_snapshot(),
+            "holds": self.hold_snapshot(),
         }
 
     def _known(self) -> Dict[str, set]:
@@ -489,18 +725,21 @@ class SentraWindow(WorkspaceWindow):
 
     def create_action(self, *args, **kwargs):
         action = super().create_action(*args, **kwargs)
+        self._memory_dirty = True
         if action is not None:
             self._auto_sync()
         return action
 
     def complete_action(self, *args, **kwargs):
         changed = super().complete_action(*args, **kwargs)
+        self._memory_dirty = True
         if changed:
             self._auto_sync()
         return changed
 
     def delete_action(self, action_id: str) -> bool:
         removed = super().delete_action(action_id)
+        self._memory_dirty = True
         if removed:
             try:
                 self.datastore.remove_action(action_id)

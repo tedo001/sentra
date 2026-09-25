@@ -135,6 +135,8 @@ class CaseView(QWidget):
 
         body = QWidget()
         content = QVBoxLayout(body)
+        #: The column the case is laid out in, for a build that adds to it.
+        self.content = content
         content.setContentsMargins(16, 14, 16, 16)
         content.setSpacing(12)
 
@@ -344,6 +346,8 @@ class ReviewPage(Page):
     decided = pyqtSignal(str, str)            # reference, decision
     undo_requested = pyqtSignal()
     export_requested = pyqtSignal()
+    #: The list's filters as (key, label); a case belongs to those in its ``_in``.
+    filters = FILTERS
 
     def __init__(self) -> None:
         super().__init__("HSE Review", "")
@@ -363,7 +367,7 @@ class ReviewPage(Page):
         self.tabs.setUsesScrollButtons(False)
         self.tabs.setExpanding(False)
         self.tabs.setDrawBase(False)
-        for _key, label in FILTERS:
+        for _key, label in self.filters:
             self.tabs.addTab(label)
         self.tabs.currentChanged.connect(self._tab)
         self.list_card = Card(flush=True)
@@ -401,11 +405,11 @@ class ReviewPage(Page):
     # -- the list -------------------------------------------------------------------
 
     def _tab(self, index: int) -> None:
-        self.filter_key = FILTERS[index][0]
+        self.filter_key = self.filters[index][0]
         self._apply()
 
     def set_counts(self, counts: Dict[str, int]) -> None:
-        for index, (key, label) in enumerate(FILTERS):
+        for index, (key, label) in enumerate(self.filters):
             self.tabs.setTabText(index, f"{label}  {counts.get(key, 0)}")
 
     def set_rows(self, rows: Sequence[Dict[str, object]]) -> None:
@@ -437,7 +441,7 @@ class ReviewPage(Page):
 
     def select(self, reference: str) -> None:
         """Show ``reference``'s case, switching to a tab that holds it."""
-        for tab_index, (key, _label) in enumerate(FILTERS):
+        for tab_index, (key, _label) in enumerate(self.filters):
             if any(str(row.get("reference")) == reference and key in row.get("_in", ())
                    for row in self.rows):
                 self.current = reference

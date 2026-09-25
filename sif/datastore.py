@@ -116,6 +116,24 @@ class DataStore:
             Column("dim", Integer),
             Column("vector", LargeBinary),
             Column("updated_at", String(32)))
+        #: Asset Safety Memory, as last computed: one row per asset.
+        self.asset_memory = Table(
+            "asset_memory", metadata,
+            Column("asset", String(200), primary_key=True),
+            Column("reports", Integer),
+            Column("precursors", Integer),
+            Column("signals", Integer),
+            Column("updated_at", String(32)),
+            Column("payload", Text))
+        #: Work-hold recommendations, one row per report.
+        self.work_holds = Table(
+            "work_holds", metadata,
+            Column("reference", String(120), primary_key=True),
+            Column("asset", String(200), index=True),
+            Column("level", String(20), index=True),
+            Column("score", Integer),
+            Column("updated_at", String(32)),
+            Column("payload", Text))
         self.sync_log = Table(
             "sync_log", metadata,
             Column("id", Integer, primary_key=True, autoincrement=True),
@@ -148,7 +166,9 @@ class DataStore:
     def push(self, reports: Iterable[Tuple[str, Dict[str, object]]] = (),
              decisions: Iterable[Dict[str, object]] = (),
              actions: Iterable[Dict[str, object]] = (),
-             audit: Iterable[Dict[str, object]] = ()) -> Dict[str, Tuple[int, int]]:
+             audit: Iterable[Dict[str, object]] = (),
+             assets: Iterable[Dict[str, object]] = (),
+             holds: Iterable[Dict[str, object]] = ()) -> Dict[str, Tuple[int, int]]:
         """Write what the console holds; returns (inserted, updated) per table."""
         origin = socket.gethostname()
         stamp = _now()
@@ -180,14 +200,46 @@ class DataStore:
             "user": str(entry.get("user", "")),
             "payload": _dump({k: v for k, v in entry.items() if k not in ("summary", "when")}),
         } for entry in audit]
+        asset_rows = [{
+            "asset": str(item.get("asset", ""))[:200], "reports": int(item.get("reports") or 0),
+            "precursors": int(item.get("precursors") or 0),
+            "signals": int(item.get("signals") or 0), "updated_at": stamp,
+            "payload": _dump(item)} for item in assets if item.get("asset")]
+        hold_rows = [{
+            "reference": str(item.get("reference", "")), "asset": str(item.get("asset", ""))[:200],
+            "level": str(item.get("level", "")), "score": int(item.get("score") or 0),
+            "updated_at": stamp, "payload": _dump(item)} for item in holds
+            if item.get("reference")]
         with self.engine.begin() as connection:
             counts = {
                 "reports": self._merge(connection, self.reports, ("fingerprint",), report_rows),
                 "decisions": self._merge(connection, self.decisions, ("key",), decision_rows),
                 "actions": self._merge(connection, self.actions, ("id",), action_rows),
                 "audit": self._merge(connection, self.audit, ("key",), audit_rows),
+                "asset_memory": self._merge(connection, self.asset_memory, ("asset",),
+                                            asset_rows),
+                "work_holds": self._merge(connection, self.work_holds, ("reference",),
+                                          hold_rows),
             }
         return counts
+
+    def holds(self, level: str = "") -> List[Dict[str, object]]:
+        """Stored work-hold recommendations, highest score first."""
+        from sqlalchemy import select
+
+        query = select(self.work_holds.c.payload).order_by(self.work_holds.c.score.desc())
+        if level:
+            query = query.where(self.work_holds.c.level == level)
+        with self.engine.connect() as connection:
+            return [json.loads(row[0]) for row in connection.execute(query)]
+
+    def assets(self) -> List[Dict[str, object]]:
+        from sqlalchemy import select
+
+        with self.engine.connect() as connection:
+            return [json.loads(row[0]) for row in connection.execute(
+                select(self.asset_memory.c.payload).order_by(
+                    self.asset_memory.c.signals.desc(), self.asset_memory.c.asset))]
 
     def remove_action(self, action_id: str) -> None:
         """An action item deleted on purpose goes from the shared database too."""
@@ -247,7 +299,8 @@ class DataStore:
 
     # -- whole-database export, for a backup archive ------------------------------------
 
-    TABLES = ("reports", "decisions", "actions", "audit", "vectors")
+    TABLES = ("reports", "decisions", "actions", "audit", "vectors", "asset_memory",
+              "work_holds")
 
     def export(self) -> Dict[str, List[Dict[str, object]]]:
         """Every row of every table, as JSON-ready dicts (vectors base64-encoded)."""
@@ -273,7 +326,7 @@ class DataStore:
         from sqlalchemy import and_, select
 
         keys = {"reports": ("fingerprint",), "decisions": ("key",), "actions": ("id",),
-                "audit": ("key",)}
+                "audit": ("key",), "asset_memory": ("asset",), "work_holds": ("reference",)}
         counts: Dict[str, Tuple[int, int]] = {}
         with self.engine.begin() as connection:
             for name, key_columns in keys.items():
@@ -303,7 +356,9 @@ class DataStore:
                               or 0)
                     for name, table in (("reports", self.reports), ("decisions", self.decisions),
                                         ("actions", self.actions), ("audit", self.audit),
-                                        ("vectors", self.vectors))}
+                                        ("vectors", self.vectors),
+                                        ("asset_memory", self.asset_memory),
+                                        ("work_holds", self.work_holds))}
 
     def describe(self) -> str:
         return describe_url(self.url)

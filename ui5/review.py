@@ -32,8 +32,21 @@ SENTRA_CASE_COLUMNS = (
 
 
 class SentraReview(ReviewPage):
+    #: Work-hold cases get a filter of their own, after Open.
+    filters = FILTERS[:1] + (("hold", "Work-hold"),) + FILTERS[1:]
+
     def __init__(self) -> None:
         super().__init__()
+        # The recommendation heads the case; the asset's memory follows the report.
+        from .assets import AssetMemoryPanel, RecommendationPanel
+
+        content = self.case.content
+        self.recommendation = RecommendationPanel()
+        content.insertWidget(0, self.recommendation)
+        self.memory = AssetMemoryPanel()
+        content.insertWidget(content.indexOf(self.case.text) + 1, self.memory)
+        self.recommendation.hide()
+        self.memory.hide()
         # The list: three columns, as narrow as the revamp draws it.
         from ui4.kit import DesignTable
 
@@ -48,12 +61,12 @@ class SentraReview(ReviewPage):
         self.tabs.parentWidget().hide()
         self.show_box = QComboBox()
         self.show_box.setFixedWidth(170)
-        for _key, label in FILTERS:
+        for _key, label in self.filters:
             self.show_box.addItem(label)
         self.show_box.currentIndexChanged.connect(self.tabs.setCurrentIndex)
         self.head.actions.insertWidget(0, self.show_box)
 
     def set_counts(self, counts: Dict[str, int]) -> None:
         super().set_counts(counts)
-        for index, (key, label) in enumerate(FILTERS):
+        for index, (key, label) in enumerate(self.filters):
             self.show_box.setItemText(index, f"{label} ({counts.get(key, 0)})")

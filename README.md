@@ -40,6 +40,8 @@ barrier controls, the latest reports and the weekly risk trend.*
 | **One sign-in, two workspaces** | The account decides which one opens. An **HSE Analyst** ingests, analyses, decides review cases, tracks compliance actions and investigates hotspots. An **Administrator** runs the engines, settings, logs, accounts and data - and records no review decisions, so platform control and safety judgement stay in separate hands. |
 | **The engine** | Three opinions on every report - deterministic IOGP rules, a semantic encoder and a learned XGBoost model - fused so recall only grows, with the evidence for every verdict. |
 | **gemma2:latest, always on** | The local LLM (through Ollama) is switched on from the start as a fourth opinion and the translator for reports not written in English. A button in the title row shows whether it is answering. |
+| **Asset Safety Memory** | Every asset's incidents, near misses, hazards, control failures, SIF precursors and corrective actions. Each new report is read against its asset's history for recurring hazards, repeated control failures and emerging SIF-precursor scenarios. |
+| **Work-Hold Recommendation** | *Continue*, *HSE Review Required* or *Work-Hold Recommended* for every report, with each factor behind it and its weight. Holds lead Home, have their own review filter and are written to the audit log. |
 | **Human review** | Nothing the engine calls SIF-potential closes without a person. Decisions are signed, persisted and become the labels training uses. |
 | **Local SQL database** | Every report, decision, action item and audit entry is kept in SQLite (or a shared PostgreSQL / MySQL server) and loaded at the next start. |
 | **Vector database** | Each report's embedding, for "find reports like this one". |
@@ -56,6 +58,8 @@ barrier controls, the latest reports and the weekly risk trend.*
 | **Dashboard** — last 30 / 90 days or 12 months, by site and activity: SIF exposure by rule, failed barriers, recent reports and the weekly trend (line or bar). | **HSE Review** — the case list beside the case: engine assessment (not a decision), the report in English, evidence and reasoning, and three keys to decide it. |
 | ![Action Items](docs/sentra-actions.png) | ![Risk Hotspots](docs/sentra-hotspots.png) |
 | **Action Items** — the compliance calendar: recurring and corrective HSE work by category, month or week, with what is due next. | **Risk Hotspots** — repeats ranked by SIF-precursor density (Wilson lower bound), not by report count, with each site's incidents, activities and barrier failures. |
+| ![Asset Memory](docs/sentra-assets.png) | |
+| **Asset Memory** — every asset, worst first: its reports by kind, what its history says, its hazards and control failures, its reports with their recommendations, and its corrective actions. | |
 
 **Profile** holds the person's details, password change, preferences, their own
 activity and their sign-in history.
@@ -72,6 +76,78 @@ activity and their sign-in history.
 | **Settings** — General, Organization, Users & Roles, Models, Security, Storage and Notifications; e.g. a reason required to overturn the engine. Every change is audited with the value it replaced. | **SysLog** — what the software did, service by service, with a live tail and export. |
 | ![Audit Log](docs/sentra-admin-audit.png) | ![New HSE Login](docs/sentra-admin-accounts.png) |
 | **Audit Log** — what people did, hash-chained, with the previous and new value of every change and a check of the chain. | **New HSE Login** — create accounts with a one-time password, change roles, reset passwords, disable and enable. |
+
+## Asset Safety Memory and Work-Hold Recommendation
+
+![A review case with its recommendation](docs/sentra-review.png)
+
+### Asset Safety Memory (`sif/assets.py`)
+
+An **asset** is the installation a report is about - an OCS, a rig, a
+compressor station, a substation - named by the export's `site` column or, when
+there is none, the location the engine read from the text. Its memory holds:
+
+* every report, read from its own wording as an **incident** (someone hurt,
+  something damaged or released), a **near miss** (people at work with the
+  hazard present, or stopped in time) or a **hazard observation** (a condition
+  found with no one exposed);
+* the **hazards** (high-energy sources) and **control failures** (barriers
+  failed or absent) the engine found;
+* the **SIF precursors**, and which ones an HSE reviewer confirmed or rejected;
+* the **corrective actions** raised against its reports - open, overdue or done;
+* the **equipment tags** its reports name (`P-3B`, `GGS-5`, `K-101`).
+
+Each new report is read against what came before at the same asset (the last
+90 days) and raises **signals** for the reviewer:
+
+| Signal | When |
+| --- | --- |
+| Recurring hazard | The same energy source was reported at this asset before; *high* when an earlier one had fatal potential. |
+| Repeated control failure | The same barrier failed here before. |
+| Corrective action did not hold | An action closed for an earlier report, and the same control failed again. |
+| Emerging SIF precursor | The same hazard-and-failed-control scenario with fatal potential again, or more precursors in the last 30 days than the 30 before. |
+| Confirmed precursor on record | An HSE reviewer confirmed SIF potential on an earlier report here. |
+| Open corrective action | Actions still open or overdue at this asset. |
+
+The memory is derived from the reports, decisions and actions SENTRA keeps, so
+it can never disagree with them. It is also written to the SQL database
+(`asset_memory`), so other workstations and reporting tools can read it.
+
+### Work-Hold Recommendation (`sif/workhold.py`)
+
+Every report gets **Continue**, **HSE Review Required** or **Work-Hold
+Recommended**, from six kinds of evidence, each shown with its weight:
+
+| Evidence | Weight |
+| --- | --- |
+| Hazards: a high-energy source | +2 |
+| SIF precursor: the engine's fatal-potential verdict; the learned model or the local LLM agreeing | +3; +1 |
+| Failed or absent controls | +2 |
+| Exposure severity: critical risk (≥ 85) or high (≥ 50); people exposed | +3 or +1; +1 |
+| Activity context: work the Life-Saving Rules single out (isolation, confined space, height, lifting, hot work, excavation, live electrical, well operations) | +1 |
+| Asset history: repeated control failure, a corrective action that did not hold, an emerging precursor, a recurring hazard, a confirmed precursor, overdue actions | +1 to +3 each |
+
+The rules, in one paragraph: **Work-Hold Recommended** when the report has
+fatal potential *and* a failed or absent control *and* either critical
+exposure or an asset history of that control failing again, a corrective
+action not holding or an emerging precursor - or when the weighted evidence
+reaches 12. **HSE Review Required** for fatal potential, a risk of 50 or more, a
+high-energy source with a failed control, a significant history signal, or
+weighted evidence of 4 or more. **Continue** otherwise.
+
+A recommendation is advice to a person, never an order:
+
+* Holds and reviews are **routed to HSE experts**: holds lead *Home*, have a
+  *Work-hold* filter at the top of *HSE Review*, carry "Work-hold" in the case
+  list, and each new hold is written to the audit log once (`work-hold
+  recommended`, with the asset, the reason and the score).
+* The case shows the recommendation above the engine assessment, every factor
+  with its evidence, and **Raise a corrective action** linked to the report.
+* A reviewer's decision stands beside it: judging a report *not SIF* releases
+  the hold (recorded as the reason); confirming SIF keeps it at least under
+  review. If the report says the work was already stopped, the advice is to
+  keep it stopped until the controls are restored.
+* Recommendations are written to the SQL database (`work_holds`).
 
 ## The title row
 
@@ -166,6 +242,27 @@ All of this is on the administrator's **Data & Backup** tab.
   backup cannot be opened.**
 * **The sync & backup log** lists every sync, backup, verify, restore and
   connection test with its outcome, and each one is also in the Audit Log.
+
+## Problem Statement 26165: what is met, and what is not yet
+
+| Requirement | Where SENTRA meets it | Evidence |
+| --- | --- | --- |
+| Ingest OIL's free-text safety reports (UA/UC observations, near misses, incidents) | **Ingest**: CSV exports from the HSSE platform, PDFs, scans and photographs (OCR), pasted narratives; twelve languages, with translation by the local LLM. | `samples/` covers every path; `test_functional.py`. |
+| a) Classify each report as SIF-potential vs non-SIF-potential | Every report: `sif_potential`, `p_sif = energy × barrier` (the EEI "high energy and no direct control" model), a 0-100 risk score, and the evidence behind the verdict; the learned model and the local LLM give second and third opinions. | `evaluation/`: recall **1.000**, precision **1.000** on 42 labelled reports (25 precursors, 17 negative controls). |
+| b) Tag the relevant IOGP Life-Saving Rule | `iogp_rule` on every report: all nine current IOGP Life-Saving Rules (Bypassing Safety Controls, Confined Space, Driving, Energy Isolation, Hot Work, Line of Fire, Safe Mechanical Lifting, Work Authorisation, Working at Height), plus two oil-and-gas extensions (Excavation & Ground Disturbance, Well Control & Process Containment). | Rule accuracy **0.960** on the true positives. |
+| c) Surface recurring precursor patterns (activity, location, barrier failure) via a dashboard | **Dashboard** (SIF exposure by rule, failed barriers, high-energy sources, flagged activities, weekly trend), **Risk Hotspots** (location, activity, rule-at-location and repeated-barrier clusters) and **Asset Memory** (recurring hazards, repeated control failures, emerging precursors per asset). | `sif/patterns.py`, `sif/assets.py`; tests in `test_sif.py`, `test_asset_memory.py`. |
+| Interactive dashboard that ranks sites/activities by SIF-precursor density | Risk Hotspots ranks by **SIF-precursor density** discounted by a Wilson lower bound (so 2-of-2 cannot outrank a well-evidenced cluster), not by report count; period, site and activity filters; the recent reports, each hotspot and each asset open their reports. | `test_app4.py`, `test_sentra.py`. |
+| Auto-map to Life-Saving Rules to focus interventions where fatal potential is highest | The rule tag drives the dashboard's exposure chart, the hotspot table, the review case and the **Work-Hold Recommendation**, which routes the highest-risk cases to an HSE expert first. | `test_asset_memory.py`. |
+| Replace periodic (monthly / quarterly) manual triage | Each report is analysed the moment it is ingested and, if it needs a person, queued at once; Home shows what is waiting and for how long. | Home and HSE Review. |
+| Flag the ~20-25% of reports with genuine fatal potential | The engine does not aim at a quota: it flags a report when a high-energy source meets a failed or absent control, and the Dashboard shows the share it flagged. | On the bundled samples the share is high (13 of 18) because those files were written to exercise precursors; the share on OIL's own reports is not yet known. |
+
+**What is not yet proven.** Every figure above comes from reports written for
+this repository, and the vocabulary was extended after seeing which of them it
+missed (see *How good is the engine?*). The numbers that matter will come from
+OIL's own UA/UC, near-miss and incident reports, reviewed by OIL's HSE team -
+which is what the review queue records. SENTRA reads HSSE exports (CSV, PDF,
+scans); it has no live connection to the HSSE platform, so reports arrive when
+an export is ingested.
 
 ## Run it
 
@@ -384,10 +481,12 @@ git tag -a v2.1.0 -m "..." && git push origin v2.1.0
 | `main5.py` | `SentraWindow` — the revamp pages, the SQL sync, the vector index, backup and restore, the always-on LLM and its button. |
 | `main4.py` | `WorkspaceWindow` — the two workspaces, their tabs, the two-role permission table, the compliance calendar. |
 | `ui4/` | The two-workspace pages and their wiring (`hse_wiring`, `admin_wiring`), the design kit (`kit`), the title and tab rows (`shell`), the sign-in. |
-| `ui5/` | The revamp's variants: dashboard and charts, review, action items, sign-in; the Data & Backup page; the gemma2 button; background tasks. |
+| `ui5/` | The revamp's variants: dashboard and charts, review, action items, sign-in; the Asset Memory page and the recommendation and memory panels; the Data & Backup page; the gemma2 button; background tasks. |
 | `ui/sentra_theme.py`, `ui/workspace_theme.py` | The SENTRA style sheet (Inter, JetBrains Mono, Tailwind greys) over the two-workspace one; both keep every pop-up white. |
 | `sif/datastore.py` | The SQL database (SQLAlchemy): reports, decisions, action items, audit mirror, vectors, sync log; content-keyed push / pull; export / import for backups. |
 | `sif/vectorstore.py` | Report embeddings per encoder, cosine search. |
+| `sif/assets.py` | Asset Safety Memory: each asset's history and the signals it raises about a report. |
+| `sif/workhold.py` | Work-Hold Recommendation: Continue / HSE Review Required / Work-Hold Recommended, with weighted, explained factors. |
 | `sif/backup.py` | Encrypted archives with a SHA-256 manifest; folder, S3 (AWS SigV4) and WebDAV targets; schedule and retention. |
 | `sif/vault.py` | Secrets sealed at rest: DPAPI on Windows, an owner-only Fernet key elsewhere. |
 | `sif/accounts.py` | Accounts, roles, PBKDF2 passwords, lockout, one-time passwords, sign-in by email. |
@@ -419,7 +518,8 @@ git tag -a v2.1.0 -m "..." && git push origin v2.1.0
 | `test_access.py` | 32 tests: sign-in, roles, lockout, one-time passwords and the audit chain. |
 | `test_app4.py` | 37 tests: the two workspaces, their tabs and permissions, every page. |
 | `test_actions.py`, `test_present.py` | 21 tests: the compliance calendar and the presentation helpers. |
-| `test_sentra.py` | 20 tests: SENTRA's pages, gemma2 always on and who may switch it off, the database written and reloaded, sync, similar-report search, backup / verify / restore, scheduled backups, the sign-in's alignment, forgot password end to end, menus measured as opaque white, and nothing leaking into app4. |
+| `test_asset_memory.py` | 15 tests: assets and report kinds, every memory signal, the time window, corrective actions that did not hold, and every recommendation rule including a reviewer's decision. |
+| `test_sentra.py` | 25 tests: the Asset Memory tab, holds leading Home and HSE Review and audited once, the case panels, a rejection releasing a hold, the memory and holds in the database; SENTRA's pages, gemma2 always on and who may switch it off, the database written and reloaded, sync, similar-report search, backup / verify / restore, scheduled backups, the sign-in's alignment, forgot password end to end, menus measured as opaque white, and nothing leaking into app4. |
 | `test_sentra_data.py` | 18 tests: the SQL store, the vector index, the vault, the archive and its tamper checks, AWS SigV4 against the suite's own vectors, and the folder, S3 and WebDAV targets against local servers that verify each request. |
 | `sample_reports.csv` | Six mock rows for the batch-import demo. |
 | `samples/` | Test material for every ingestion path - an 18-report CSV, a shift log, a text-layer PDF, a scan with no text layer, and reports in five Indian languages. See `samples/README.md`. |
@@ -622,11 +722,12 @@ On a headless machine prefix with `QT_QPA_PLATFORM=offscreen`, and with
 `SIF_ENCODER=hashing` to pin the offline encoder so the run needs no model
 download and is deterministic.
 
-**423 tests.** They cover every pipeline stage and the fusion guards, the MLOps
+**443 tests.** They cover every pipeline stage and the fusion guards, the MLOps
 round-trip, document extraction and the OCR model cache, the local LLM's
 readiness and model-name handling, the review bench and its decision trail, the
 update checker and the release pipeline, sign-in, roles and the audit chain, the
-two workspaces, the compliance calendar, SENTRA's database, vector index, sync,
+two workspaces, the compliance calendar, the asset memory and work-hold
+recommendations, SENTRA's database, vector index, sync,
 encrypted backup and restore against local S3 and WebDAV servers — and the
 interface itself, driven headless against the real `samples/` files from import
 through review to a trained model.

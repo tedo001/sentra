@@ -253,6 +253,23 @@ QToolButton#LLMButton[state="off"] {{ color: {G[400]}; }}
 QToolButton#LLMButton[state="offline"] {{ border-color: rgba(239,68,68,0.55); }}
 QToolButton#LLMButton::menu-button {{ border: none; width: 16px; }}
 QToolButton#LLMButton::menu-arrow {{ width: 8px; height: 8px; }}
+/* work-hold recommendation and asset safety memory, in the review case */
+QFrame#HoldPanel {{
+    background: #FFFFFF; border: 1px solid {G[200]}; border-left: 4px solid {G[400]};
+    border-radius: 6px;
+}}
+QFrame#HoldPanel[level="hold"] {{ background: #FEF2F2; border-color: #FECACA; border-left-color: #DC2626; }}
+QFrame#HoldPanel[level="review"] {{ background: #FFFBEB; border-color: #FDE68A; border-left-color: #F59E0B; }}
+QFrame#HoldPanel[level="continue"] {{ background: #F0FDF4; border-color: #BBF7D0; border-left-color: #16A34A; }}
+QFrame#HoldPanel QLabel, QFrame#MemoryPanel QLabel {{ background: transparent; }}
+QLabel#HoldSummary {{ font-size: 14px; font-weight: 600; color: {G[900]}; }}
+QLabel#FactorWeight {{ font-family: {MONO}; font-size: 12px; color: {G[500]}; min-width: 26px; }}
+QLabel#FactorName {{ font-size: 12px; font-weight: 600; color: {G[800]}; }}
+QLabel#FactorEvidence {{ font-size: 12px; color: {G[600]}; }}
+QFrame#MemoryPanel {{ background: {G[50]}; border: 1px solid {G[200]}; border-radius: 6px; }}
+QLabel#SignalKind {{ font-size: 12px; font-weight: 600; color: {G[800]}; }}
+QLabel#SignalText {{ font-size: 12px; color: {G[600]}; }}
+QLabel#SignalMark {{ font-size: 12px; }}
 /* pop-ups in the revamp's greys (the rules above keep them white everywhere) */
 QMenu, QFrame#WorkspaceHeader QMenu, QFrame#TabRow QMenu, QFrame#Card QMenu,
 QWidget#DesignPage QMenu {{

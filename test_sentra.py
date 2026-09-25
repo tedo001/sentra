@@ -127,14 +127,14 @@ class TestSentra(unittest.TestCase):
 
     # -- the shell ------------------------------------------------------------------
 
-    def test_the_hse_workspace_keeps_its_seven_tabs_in_the_revamp_pages(self) -> None:
+    def test_the_hse_workspace_has_its_tabs_and_asset_memory_in_the_revamp_pages(self) -> None:
         from ui5.actions import SentraActions
         from ui5.dashboard import SentraDashboard
         from ui5.review import SentraReview
 
         window = self._window("reviewer")
         self.assertEqual(window.tab_row.keys, ["home", "ingest", "dashboard", "review",
-                                               "actions", "hotspots", "profile"])
+                                               "actions", "hotspots", "assets", "profile"])
         self.assertIsInstance(window.dashboard_page, SentraDashboard)
         self.assertIsInstance(window.review_page, SentraReview)
         self.assertIsInstance(window.actions_view, SentraActions)
@@ -339,6 +339,91 @@ class TestSentra(unittest.TestCase):
         self.assertFalse(admin.backup_now())
         self.assertFalse(admin.save_backup_settings({"kind": "folder", "folder": self.folder},
                                                     {}))
+
+    # -- Asset Safety Memory and Work-Hold Recommendation ---------------------------------
+
+    def _analyse_samples(self, window) -> None:
+        window._start(window._analysis_worker(csv_path=os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), "samples", "near_miss_reports.csv")))
+        self.assertTrue(window.worker.wait(120_000))
+        self.app.processEvents()
+        window.wait_for_tasks()
+
+    def test_asset_memory_is_a_tab_and_ranks_the_assets(self) -> None:
+        window = self._window("reviewer")
+        self.assertIn("assets", window.tab_row.keys)
+        self.assertEqual(window.tab_row.keys[-2:], ["assets", "profile"])
+        self._analyse_samples(window)
+        window.navigate("assets")
+        page = window.assets_page
+        names = [row["asset"] for row in page.table.rows]
+        self.assertIn("Duliajan OCS-4", names[:3])
+        self.assertEqual(page.title.text(), names[0])
+        page.select("Duliajan OCS-4")
+        self.assertEqual([row["reference"] for row in page.timeline.rows],
+                         ["NM-2607", "NM-2601"])
+        self.assertTrue(page.signal_box.count())
+
+    def test_work_holds_lead_home_and_review_and_are_audited_once(self) -> None:
+        window = self._window("reviewer")
+        self._analyse_samples(window)
+        holds = window.holds()
+        self.assertIn("NM-2607", holds)
+        self.assertEqual(window.recommendation("NM-2607").level, "hold")
+        self.assertEqual(window.recommendation("NM-2609").level, "continue")
+        window.navigate("home")
+        first = window.home_page.attention.body.itemAt(0).widget()
+        self.assertIn("Work-Hold Recommended", " ".join(
+            label.text() for label in first.findChildren(__import__(
+                "PyQt6.QtWidgets", fromlist=["QLabel"]).QLabel)))
+        window.navigate("review")
+        page = window.review_page
+        self.assertEqual(page.filters[1], ("hold", "Work-hold"))
+        self.assertTrue(page.rows[0]["trigger"].startswith("Work-hold"))
+        raised = [line for line in self._actions() if line == "work-hold recommended"]
+        self.assertEqual(len(raised), len(holds))
+        window._memory_dirty = True
+        window.memory()
+        self.assertEqual(len([line for line in self._actions()
+                              if line == "work-hold recommended"]), len(holds))
+
+    def test_a_case_shows_its_recommendation_and_its_asset_history(self) -> None:
+        window = self._window("reviewer")
+        self._analyse_samples(window)
+        window.show()
+        window.navigate("review")
+        window.review_page.select("NM-2607")
+        self.app.processEvents()
+        panel = window.review_page.recommendation
+        self.assertTrue(panel.isVisible())
+        self.assertEqual(panel.level.text(), "Work-Hold Recommended")
+        memory = window.review_page.memory
+        self.assertTrue(memory.isVisible())
+        self.assertEqual(memory.name.text(), "Duliajan OCS-4")
+        self.assertIn("NM-2601", [memory.earlier.itemAt(i).widget().text().split(" ")[0]
+                                  for i in range(memory.earlier.count())
+                                  if memory.earlier.itemAt(i).widget()])
+        window.close()
+
+    def test_a_reviewer_who_rejects_a_hold_releases_it(self) -> None:
+        window = self._window("reviewer")
+        self._analyse_samples(window)
+        window.navigate("review")
+        window.review_page.select("NM-2607")
+        self.assertTrue(window.decide_case("NM-2607", "rejected"))
+        self.assertNotIn("NM-2607", window.holds())
+        self.assertEqual(window.recommendation("NM-2607").level, "continue")
+
+    def test_the_memory_and_the_holds_are_kept_in_the_database(self) -> None:
+        window = self._window("reviewer")
+        self._analyse_samples(window)
+        window.wait_for_tasks()
+        store = window.datastore
+        self.assertGreaterEqual(store.counts()["asset_memory"], 10)
+        stored = {item["reference"]: item["level"] for item in store.holds()}
+        self.assertEqual(stored["NM-2607"], "hold")
+        ocs4 = next(item for item in store.assets() if item["asset"] == "Duliajan OCS-4")
+        self.assertTrue(ocs4["signal_list"])
 
     # -- the sign-in -----------------------------------------------------------------------------
 
