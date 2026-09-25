@@ -244,6 +244,32 @@ class TestBuildFour(unittest.TestCase):
         self.assertEqual(window.styleSheet(), workspace_theme.STYLESHEET)
         self.assertEqual(window.windowTitle(), "SENTRA")
 
+    def test_presentation_mode_scales_the_interface_before_qt_starts(self) -> None:
+        import app4
+
+        saved = {key: os.environ.pop(key, None)
+                 for key in ("QT_SCALE_FACTOR", "SENTRA_SCALE", "SENTRA_PRESENT")}
+        self.addCleanup(self._restore_environment, saved)
+        self.addCleanup(setattr, app4, "_presenting", app4._presenting)
+
+        self.assertFalse(app4.presentation_requested(["app4.py"]))
+        self.assertTrue(app4.presentation_requested(["app4.py", "--present"]))
+        argv = app4.enter_presentation(["app4.py", "--present"])
+        self.assertEqual(argv, ["app4.py"], "Qt must not see the flag")
+        self.assertEqual(os.environ["QT_SCALE_FACTOR"], app4.PRESENT_SCALE)
+
+        os.environ.pop("QT_SCALE_FACTOR")
+        os.environ["SENTRA_SCALE"] = "2"
+        app4.enter_presentation(["app4.py"])
+        self.assertEqual(os.environ["QT_SCALE_FACTOR"], "2")
+
+    @staticmethod
+    def _restore_environment(saved) -> None:
+        for key, value in saved.items():
+            os.environ.pop(key, None)
+            if value is not None:
+                os.environ[key] = value
+
     def test_building_it_leaves_the_other_builds_as_they_were(self) -> None:
         import app
         from ui import green_theme
