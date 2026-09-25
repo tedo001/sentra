@@ -19,7 +19,8 @@ import os
 from PyQt6.QtCore import QPointF, QRectF, Qt
 from PyQt6.QtGui import (QColor, QIcon, QLinearGradient, QPainter, QPainterPath, QPen,
                          QPixmap)
-from PyQt6.QtWidgets import QFrame, QHBoxLayout, QLabel, QLineEdit, QVBoxLayout, QWidget
+from PyQt6.QtWidgets import (QFrame, QHBoxLayout, QLabel, QLineEdit, QSizePolicy, QVBoxLayout,
+                             QWidget)
 
 from sif import prefs
 from ui.theme import ASSETS
@@ -109,6 +110,10 @@ class GradientPanel(QFrame):
         super().paintEvent(event)
 
 
+#: The sign-in block's width: wordmark, form and notes.
+FORM_WIDTH = 340
+
+
 class SentraLogin(WorkspaceLogin):
     def _arrange(self, form: QWidget):
         left = QFrame()
@@ -134,14 +139,30 @@ class SentraLogin(WorkspaceLogin):
         column.addLayout(brand)
         column.addStretch(1)
 
-        body = QVBoxLayout()
+        # The wordmark, the tagline, every label, field, button and note share
+        # one left edge, and the block sits in the middle of the white half.
+        if form.layout() is not None:
+            form.layout().setContentsMargins(0, 0, 0, 0)
+        form.setFixedWidth(FORM_WIDTH)
+        block = QWidget()
+        block.setObjectName("LoginBlock")
+        block.setFixedWidth(FORM_WIDTH)
+        block.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Maximum)
+        form.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Maximum)
+        body = QVBoxLayout(block)
+        body.setContentsMargins(0, 0, 0, 0)
         body.setSpacing(2)
         body.addWidget(_l("SENTRA", "FormWordmark"))
         body.addWidget(_l("Safety · Intelligence · Compliance", "FormTag"))
-        body.addSpacing(26)
+        body.addSpacing(28)
         body.addWidget(form)
-        form.setFixedWidth(320)
-        column.addLayout(body)
+        body.addStretch(1)
+        centred = QHBoxLayout()
+        centred.setContentsMargins(0, 0, 0, 0)
+        centred.addStretch(1)
+        centred.addWidget(block)
+        centred.addStretch(1)
+        column.addLayout(centred)
         column.addStretch(1)
         column.addWidget(_l(f"Oil India Limited  |  {prefs.get('project_code', 'PS 26165')}",
                             "FormFoot"))
@@ -158,6 +179,7 @@ class SentraLogin(WorkspaceLogin):
                  last_run: str = "") -> None:
         super().__init__(store, audit, stylesheet, parent)
         for field, kind in ((self.username, "user"), (self.password, "lock"),
+                            (self.forgot_name, "user"),
                             (getattr(self, "setup_user", None), "user"),
                             (getattr(self, "setup_password", None), "lock")):
             if isinstance(field, QLineEdit):
@@ -165,10 +187,33 @@ class SentraLogin(WorkspaceLogin):
         self.username.setPlaceholderText("Username or email")
         self.password.setPlaceholderText("Password")
         self.remember.setText("Remember Me")
+        self.forgot_name.setPlaceholderText("Username or email")
+        # Each page as tall as its own content: labels sit on their fields, and
+        # the block centres on what is shown rather than on the tallest page.
+        for index in range(self.pages.count()):
+            self.pages.widget(index).layout().addStretch(1)
+        self.pages.currentChanged.connect(self._fit_page)
+        self._fit_page(self.pages.currentIndex())
         if not prefs.get("remember_username"):
             self.remember.setChecked(True)
         self.gradient.status.setText("●  System operational" + (
             f" · last run {last_run}" if last_run else ""))
+
+    def _fit_page(self, _current: int = -1) -> None:
+        """The page stack as tall as the page on show (a stack keeps its tallest)."""
+        page = self.pages.currentWidget()
+        if page is None:
+            return
+        layout = page.layout()
+        height = (layout.heightForWidth(FORM_WIDTH) if layout.hasHeightForWidth()
+                  else layout.sizeHint().height())
+        self.pages.setFixedHeight(max(height, layout.minimumSize().height()
+                                      if not layout.hasHeightForWidth() else 0))
+
+    def request_reset(self) -> bool:
+        sent = super().request_reset()
+        self._fit_page()
+        return sent
 
     def _heading(self, layout, title: str, why: str) -> None:
         # The revamp's sign-in page has no heading over the form; the setup and

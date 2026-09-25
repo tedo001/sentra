@@ -207,8 +207,7 @@ class WorkspaceWindow(AdminPages, IngestFlow, HSEPages, MainWindow):
         self._page_index["accounts"] = self.pages.addWidget(self.accounts_page)
 
         self.tab_row.navigated.connect(self.navigate)
-        self.shell_header.bell_clicked.connect(
-            lambda: self.navigate("audit" if self.workspace == "admin" else "review"))
+        self.shell_header.bell_clicked.connect(self._bell)
         self.shell_header.gear_clicked.connect(self._open_preferences)
         self.shell_header.preferences_requested.connect(self._open_preferences)
         self.shell_header.profile_requested.connect(lambda: self.navigate("profile"))
@@ -233,6 +232,13 @@ class WorkspaceWindow(AdminPages, IngestFlow, HSEPages, MainWindow):
             elif label.objectName() == "Muted" and label.parent() is not None \
                     and label.parent().objectName() == "PageHead":
                 label.setText(caption)
+
+    def _bell(self) -> None:
+        if self.workspace != "admin":
+            self.navigate("review")
+        else:
+            # Someone locked out waiting on a reset comes before reading the log.
+            self.navigate("accounts" if self.reset_requests() else "audit")
 
     def _open_preferences(self) -> None:
         self.navigate("settings" if self.workspace == "admin" else "profile")
@@ -320,7 +326,11 @@ class WorkspaceWindow(AdminPages, IngestFlow, HSEPages, MainWindow):
                       if str(row.get("at", "")).startswith(today)
                       and row.get("action") in ("sign-in refused", "account locked",
                                                 "permission refused")]
-            self.shell_header.set_bell(len(alarms))
+            requests = self.reset_requests()
+            self.shell_header.set_bell(len(alarms) + len(requests))
+            self.shell_header.bell.setToolTip(
+                "Security events today" + (f" · {len(requests)} password reset request(s) "
+                                           "on New HSE Login" if requests else ""))
 
     @staticmethod
     def _today() -> str:
@@ -597,6 +607,14 @@ class WorkspaceWindow(AdminPages, IngestFlow, HSEPages, MainWindow):
         changed = MainWindow.change_account_role.__wrapped__(self, username, role)
         self._refresh_accounts_page()
         return changed
+
+    @requires(MANAGE_USERS)
+    def reset_account_password(self, username: str) -> str:
+        """Issue a one-time password; it also answers any "Forgot password?" request."""
+        password = MainWindow.reset_account_password.__wrapped__(self, username)
+        self._refresh_accounts_page()
+        self._refresh_shell()
+        return password
 
     @requires(MANAGE_USERS)
     def toggle_account(self, username: str) -> bool:

@@ -7,10 +7,18 @@ setup with no default password, the same lockout, the same one-time
 password that must be replaced, the same audit entries. Only the pages are
 laid out differently, the username field also takes an email address, the
 password can be shown, and the username can be remembered on this machine.
+
+*Forgot password?* opens a fourth page. There is no mail service to send a
+reset link, so the request goes where a reset can actually happen: it is
+written to the audit log, the administrator's bell counts it, and New HSE
+Login marks the account until a one-time password is issued. The reply is the
+same whether or not the account exists, so the page cannot be used to find
+out who has one.
 """
 
 from __future__ import annotations
 
+import socket
 from typing import Optional
 
 from PyQt6.QtCore import Qt
@@ -30,7 +38,11 @@ from sif import prefs
 from sif.version import __version__
 from ui2.login import LoginDialog
 
-__all__ = ["WorkspaceLogin", "STEPS"]
+__all__ = ["WorkspaceLogin", "STEPS", "RESET_REQUESTED", "PAGES"]
+
+#: The audit action a forgotten-password request is written as.
+RESET_REQUESTED = "password reset requested"
+PAGES = ("setup", "sign in", "change", "forgot")
 
 STEPS = ("Report", "Read", "Flag", "Explain", "Person confirms")
 
@@ -122,6 +134,7 @@ class WorkspaceLogin(LoginDialog):
     def __init__(self, store, audit, stylesheet: str = "",
                  parent: Optional[QWidget] = None) -> None:
         super().__init__(store, audit, stylesheet, parent)
+        self.pages.addWidget(self._forgot_page())
         self.setWindowTitle("SENTRA - sign in")
         self.setMinimumSize(1100, 680)
         screen = QGuiApplication.primaryScreen()
@@ -220,7 +233,17 @@ class WorkspaceLogin(LoginDialog):
         self._labelled(layout, "Username or email", self.username)
         self._labelled(layout, "Password", self._password_row(self.password))
         self.remember = QCheckBox("Remember me on this workstation")
-        layout.addWidget(self.remember)
+        self.forgot_link = QPushButton("Forgot password?")
+        self.forgot_link.setObjectName("Link")
+        self.forgot_link.setFlat(True)
+        self.forgot_link.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.forgot_link.clicked.connect(lambda: self.show_page("forgot"))
+        options = QHBoxLayout()
+        options.setContentsMargins(0, 0, 0, 0)
+        options.addWidget(self.remember)
+        options.addStretch(1)
+        options.addWidget(self.forgot_link)
+        layout.addLayout(options)
         layout.addSpacing(10)
         self.sign_in_button = QPushButton("Sign in")
         self.sign_in_button.setObjectName("LoginPrimary")
@@ -236,8 +259,6 @@ class WorkspaceLogin(LoginDialog):
         layout.addSpacing(8)
         layout.addWidget(_l("After 5 failed attempts the account is locked for 5 minutes. "
                             "Every sign-in is written to the audit log.", "LoginNote", wrap=True))
-        layout.addWidget(_l("Forgotten password or locked out: ask your SENTRA administrator "
-                            "for a one-time password.", "LoginNote", wrap=True))
         return page
 
     def _setup_page(self) -> QWidget:
@@ -283,6 +304,76 @@ class WorkspaceLogin(LoginDialog):
         self.new_confirm.returnPressed.connect(self.change_password)
         layout.addWidget(self.change_button)
         return page
+
+    def _forgot_page(self) -> QWidget:
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(4)
+        self._heading(layout, "Reset your password",
+                      "Enter your username or work email. Your SENTRA administrator is "
+                      "asked to reset it and gives you a one-time password; you choose a "
+                      "new one when you sign in with it.")
+        self.forgot_name = _edit("name@oilindia.in or username", name="forgot_name")
+        self._labelled(layout, "Username or email", self.forgot_name)
+        layout.addSpacing(6)
+        self.forgot_button = QPushButton("Request a reset")
+        self.forgot_button.setObjectName("LoginPrimary")
+        self.forgot_button.clicked.connect(self.request_reset)
+        self.forgot_name.returnPressed.connect(self.request_reset)
+        self.forgot_name.textEdited.connect(lambda _text: self.forgot_button.setEnabled(True))
+        layout.addWidget(self.forgot_button)
+        layout.addSpacing(8)
+        self.forgot_note = _l("", "LoginNote", wrap=True)
+        self.forgot_note.hide()
+        layout.addWidget(self.forgot_note)
+        back = QPushButton("← Back to sign in")
+        back.setObjectName("Link")
+        back.setFlat(True)
+        back.setCursor(Qt.CursorShape.PointingHandCursor)
+        back.clicked.connect(lambda: self.show_page("sign in"))
+        row = QHBoxLayout()
+        row.setContentsMargins(0, 0, 0, 0)
+        row.addWidget(back)
+        row.addStretch(1)
+        layout.addLayout(row)
+        return page
+
+    # -- pages: the parent's three and the forgotten password -------------------------
+
+    def show_page(self, name: str) -> None:
+        if name != "forgot":
+            super().show_page(name)
+            return
+        self.pages.setCurrentIndex(PAGES.index("forgot"))
+        self._clear_error()
+        self.forgot_note.hide()
+        self.forgot_name.setText(self.username.text().strip())
+        self.forgot_name.setFocus()
+
+    @property
+    def page(self) -> str:
+        return PAGES[self.pages.currentIndex()]
+
+    def request_reset(self) -> bool:
+        """Ask the administrator for a reset; the reply never says whether it exists."""
+        typed = self.forgot_name.text().strip()
+        if not typed:
+            self._fail("Enter your username or work email.")
+            return False
+        self._clear_error()
+        username = self.store.resolve(typed)
+        account = self.store.get(username)
+        self.audit.functionality(RESET_REQUESTED,
+                                 username=account.username if account else typed.lower(),
+                                 known=account is not None,
+                                 workstation=socket.gethostname())
+        self.forgot_note.setText(
+            "Request sent. If an account matches, your administrator has been asked to "
+            "reset it and will give you a one-time password. Nothing is emailed.")
+        self.forgot_note.show()
+        self.forgot_button.setEnabled(False)
+        return True
 
     # -- remembering the username ------------------------------------------------------
 

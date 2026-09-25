@@ -398,6 +398,32 @@ class AdminPages:
         page.toggle_requested.connect(self.toggle_account)
         return page
 
+    def reset_requests(self) -> Dict[str, str]:
+        """username -> when, for "Forgot password?" requests not yet answered.
+
+        A request stands until a one-time password is issued for that account
+        or its owner changes the password.
+        """
+        from ui4.login import RESET_REQUESTED
+
+        pending: Dict[str, str] = {}
+        settled = set()
+        for row in self.audit.rows(limit=0):  # newest first
+            detail = row.get("detail") or {}
+            username = str(detail.get("username") or "")
+            if not username or username in settled or username in pending:
+                continue
+            action = row.get("action")
+            if action == RESET_REQUESTED:
+                if detail.get("known", True) and (self.accounts is None
+                                                  or self.accounts.get(username)):
+                    pending[username] = str(row.get("at", ""))
+                else:
+                    settled.add(username)
+            elif action in ("password reset", "password changed"):
+                settled.add(username)
+        return pending
+
     def _refresh_accounts_page(self) -> None:
         if not hasattr(self, "accounts_page"):
             return
@@ -407,6 +433,7 @@ class AdminPages:
         page.set_choices([str(site) for site in setting("sites") or []],
                          [str(dept) for dept in setting("departments") or []])
         rows = []
+        requests = self.reset_requests()
         for account in (self.accounts.accounts() if self.accounts else []):
             last = "now" if account.username == self.session.username else (
                 _short_time(account.last_login).replace(" ", "\n", 1).replace(" ", "\n")
@@ -416,8 +443,11 @@ class AdminPages:
                          "role": account.role,
                          "role_label": ROLE_NAMES.get(account.role, account.role),
                          "site": account.site or "\u2014",
-                         "status": ("\u2713 Active", "ok") if account.active
-                         else ("\u25a0 Disabled", "grey"),
+                         "status": ("↻ Reset requested", "warn")
+                         if account.username in requests
+                         else ("✓ Active", "ok") if account.active
+                         else ("■ Disabled", "grey"),
+                         "reset_requested": requests.get(account.username, ""),
                          "active": account.active, "last": last})
         page.set_accounts(rows, self.session.username)
 

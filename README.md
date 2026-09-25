@@ -89,8 +89,9 @@ activity and their sign-in history.
   administrator the arrow opens *Check the connection now*, *Turn the LLM
   analyser off / on* and *Host and model settings…*; nobody else can switch it
   off, and the choice is kept between sessions.
-* **The bell** counts what needs a person: cases waiting in the HSE workspace,
-  refused sign-ins and permission refusals today in Administration.
+* **The bell** counts what needs a person: cases waiting in the HSE workspace;
+  in Administration, today's refused sign-ins and permission refusals plus any
+  outstanding password reset requests.
 * **The account menu** — name, username, role and project, then *My profile*,
   *Preferences* / *System settings* and *Sign out*.
 
@@ -100,11 +101,20 @@ it cannot turn transparent (black on Windows) again.
 
 ## Sign-in and a record of who did what
 
-![Sign in](docs/sentra-signin.png)
+| | |
+| --- | --- |
+| ![Sign in](docs/sentra-signin.png) | ![Forgot password](docs/sentra-forgot.png) |
 
 * **No default password.** The first start on a machine creates the
   administrator; everyone else is created on *New HSE Login* and signs in by
   username or email with a one-time password they must change.
+* **Forgot password?** Beside *Remember Me*. There is no mail service to send
+  a link, so the request goes where a reset can actually happen: it is written
+  to the audit log, the administrator's bell counts it (and opens *New HSE
+  Login*), and the account is marked **Reset requested** until a one-time
+  password is issued, which the person replaces at their next sign-in. The
+  reply is the same whether or not the account exists, so the page cannot be
+  used to find out who has one.
 * **Passwords are never stored** — a salted PBKDF2-HMAC-SHA256 digest at 600,000
   iterations. Five wrong attempts lock an account for five minutes.
 * **Every record names its person.** Each analysed report says who analysed it,
@@ -409,7 +419,7 @@ git tag -a v2.1.0 -m "..." && git push origin v2.1.0
 | `test_access.py` | 32 tests: sign-in, roles, lockout, one-time passwords and the audit chain. |
 | `test_app4.py` | 37 tests: the two workspaces, their tabs and permissions, every page. |
 | `test_actions.py`, `test_present.py` | 21 tests: the compliance calendar and the presentation helpers. |
-| `test_sentra.py` | 18 tests: SENTRA's pages, gemma2 always on and who may switch it off, the database written and reloaded, sync, similar-report search, backup / verify / restore, scheduled backups, the sign-in, menus measured as opaque white, and nothing leaking into app4. |
+| `test_sentra.py` | 20 tests: SENTRA's pages, gemma2 always on and who may switch it off, the database written and reloaded, sync, similar-report search, backup / verify / restore, scheduled backups, the sign-in's alignment, forgot password end to end, menus measured as opaque white, and nothing leaking into app4. |
 | `test_sentra_data.py` | 18 tests: the SQL store, the vector index, the vault, the archive and its tamper checks, AWS SigV4 against the suite's own vectors, and the folder, S3 and WebDAV targets against local servers that verify each request. |
 | `sample_reports.csv` | Six mock rows for the batch-import demo. |
 | `samples/` | Test material for every ingestion path - an 18-report CSV, a shift log, a text-layer PDF, a scan with no text layer, and reports in five Indian languages. See `samples/README.md`. |
@@ -612,7 +622,7 @@ On a headless machine prefix with `QT_QPA_PLATFORM=offscreen`, and with
 `SIF_ENCODER=hashing` to pin the offline encoder so the run needs no model
 download and is deterministic.
 
-**421 tests.** They cover every pipeline stage and the fusion guards, the MLOps
+**423 tests.** They cover every pipeline stage and the fusion guards, the MLOps
 round-trip, document extraction and the OCR model cache, the local LLM's
 readiness and model-name handling, the review bench and its decision trail, the
 update checker and the release pipeline, sign-in, roles and the audit chain, the

@@ -360,6 +360,72 @@ class TestSentra(unittest.TestCase):
         self.assertIsNotNone(dialog.session)
         self.assertEqual(dialog.session.username, "a.baruah")
 
+    def _login(self):
+        from sif.audit import AuditLog
+        from ui import sentra_theme
+        from ui5.login import SentraLogin
+
+        sentra_theme.prepare()
+        dialog = SentraLogin(self.store, AuditLog(self.audit_path), sentra_theme.STYLESHEET)
+        self.addCleanup(dialog.close)
+        dialog.resize(1440, 900)
+        dialog.show()
+        self.app.processEvents()
+        return dialog
+
+    def test_the_sign_in_block_is_centred_on_one_left_edge(self) -> None:
+        from PyQt6.QtCore import QPoint
+        from PyQt6.QtWidgets import QFrame, QLabel
+
+        self.store.create("a.baruah", "Anupam Baruah", "reviewer", PASSWORD)
+        dialog = self._login()
+        left = dialog.findChild(QFrame, "LoginForm")
+        wordmark = dialog.findChild(QLabel, "FormWordmark")
+        edges = {widget.mapTo(left, QPoint(0, 0)).x()
+                 for widget in (wordmark, dialog.username, dialog.password.parentWidget(),
+                                dialog.remember, dialog.sign_in_button)}
+        self.assertEqual(len(edges), 1, edges)
+        block = wordmark.parentWidget()
+        centre = block.mapTo(left, QPoint(0, 0)).x() + block.width() / 2
+        self.assertAlmostEqual(centre, left.width() / 2, delta=2)
+        forgot = dialog.forgot_link.mapTo(left, QPoint(dialog.forgot_link.width(), 0)).x()
+        right = dialog.sign_in_button.mapTo(left, QPoint(dialog.sign_in_button.width(), 0)).x()
+        self.assertAlmostEqual(forgot, right, delta=2)
+
+    def test_forgot_password_asks_the_administrator_without_saying_who_exists(self) -> None:
+        self.store.create("a.baruah", "Anupam Baruah", "reviewer", PASSWORD)
+        self.store.set_profile("a.baruah", email="a.baruah@oilindia.in")
+        dialog = self._login()
+        dialog.username.setText("a.baruah@oilindia.in")
+        dialog.forgot_link.click()
+        self.assertEqual(dialog.page, "forgot")
+        self.assertEqual(dialog.forgot_name.text(), "a.baruah@oilindia.in")
+        self.assertTrue(dialog.request_reset())
+        known = dialog.forgot_note.text()
+        dialog.forgot_name.setText("nobody@oilindia.in")
+        self.assertTrue(dialog.request_reset())
+        self.assertEqual(dialog.forgot_note.text(), known)
+        with open(self.audit_path, encoding="utf-8") as handle:
+            requests = [json.loads(line)["detail"] for line in handle
+                        if '"password reset requested"' in line]
+        self.assertEqual([(item["username"], item["known"]) for item in requests],
+                         [("a.baruah", True), ("nobody@oilindia.in", False)])
+        dialog.show_page("sign in")
+        self.assertEqual(dialog.page, "sign in")
+
+        admin = self._window("admin")
+        self.assertEqual(list(admin.reset_requests()), ["a.baruah"])
+        admin.navigate("accounts")
+        row = next(row for row in admin.accounts_page.table.rows
+                   if row["username"] == "a.baruah")
+        self.assertEqual(row["status"], ("↻ Reset requested", "warn"))
+        self.assertEqual(admin.shell_header.bell_badge.text(), "1")
+        admin.shell_header.bell_clicked.emit()
+        self.assertEqual(admin.pages.currentIndex(), admin._page_index["accounts"])
+        self.assertTrue(admin.reset_account_password("a.baruah"))
+        self.assertEqual(admin.reset_requests(), {})
+        self.assertFalse(admin.shell_header.bell_badge.isVisible())
+
     # -- pop-ups ---------------------------------------------------------------------------------
 
     def _menu_is_opaque_white(self, menu) -> None:
