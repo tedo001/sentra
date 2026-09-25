@@ -121,6 +121,8 @@ class ReviewView(QWidget):
         layout.setSpacing(12)
         layout.addWidget(self._build_queue(), stretch=5)
         layout.addWidget(self._build_bench(), stretch=4)
+        #: False for a role that may read cases but not decide them.
+        self.can_decide = True
         self._bind_shortcuts()
         self.set_case(None)
 
@@ -381,6 +383,28 @@ class ReviewView(QWidget):
         """Restore the remembered reviewer name."""
         self.reviewer.setText(name)
 
+    def bind_reviewer(self, signature: str) -> None:
+        """Name the signed-in person on every decision, and stop it being edited.
+
+        A free-text reviewer box let anyone decide under anyone's name. Once a
+        person has signed in, the decision is theirs, and the box says so.
+        """
+        self.reviewer.setText(signature)
+        self.reviewer.setReadOnly(True)
+        self.reviewer.setToolTip("Decisions are recorded under the account "
+                                 "that is signed in.")
+
+    def set_decision_rights(self, allowed: bool) -> None:
+        """Let this role read cases without being able to decide them."""
+        self.can_decide = allowed
+        for button in self.buttons.values():
+            button.setEnabled(allowed and button.isEnabled())
+        self.undo.setEnabled(allowed)
+        self.clear_trail.setEnabled(allowed and self.clear_trail.isEnabled())
+        if not allowed:
+            self.hint.setText("Your role can read cases but not decide them - "
+                              "an HSE Expert or an administrator decides.")
+
     def set_queue(self, rows: Sequence[Dict[str, object]], outstanding: int,
                   decided: int) -> None:
         """Render the queue and the progress line, keeping the selection."""
@@ -421,7 +445,7 @@ class ReviewView(QWidget):
     def set_case(self, result: Optional[Dict[str, object]],
                  decision: Optional[Dict[str, object]] = None) -> None:
         """Show one report, with any standing decision on it."""
-        enabled = result is not None
+        enabled = result is not None and self.can_decide
         for button in self.buttons.values():
             button.setEnabled(enabled)
         if not enabled:

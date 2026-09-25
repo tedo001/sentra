@@ -18,6 +18,8 @@ probes - happens on a ``QThread``.
 from __future__ import annotations
 
 import csv
+import functools
+import inspect
 import logging
 import os
 from collections import Counter
@@ -37,6 +39,7 @@ from PyQt6.QtWidgets import (
     QLabel,
     QMainWindow,
     QMessageBox,
+    QInputDialog,
     QProgressBar,
     QSplitter,
     QStackedWidget,
@@ -53,6 +56,9 @@ from sif.logging_setup import (LOG_LEVELS, active_log_file, configure_logging,
                                log_file_path, set_level)
 from sif.mlops import MLOpsService
 from sif import prefs
+from sif.accounts import (ANALYSE, CLEAR, CONFIGURE, DECIDE, MANAGE_USERS,
+                          PERMISSION_WORDS, ROLE_LABELS, ROLES, TRAIN, AccountStore,
+                          AuthError, Session)
 from sif.audit import AuditLog
 from sif.ocr import (LANGUAGE_CHOICES, UNSUPPORTED_LANGUAGES, DocumentExtractor,
                      cache_directory, models_present)
@@ -62,6 +68,7 @@ from sif.updater import UpdateChecker, UpdateInfo
 from sif.version import __version__, describe
 from ui.theme import PAGE_MARGIN, C, STYLESHEET
 from ui.views import HOTSPOT_COLUMNS, HOTSPOT_FLEX, AnalyticsView, TableView
+from ui2.activity import AccountDialog, ActivityView, tally
 from ui2.components import HeaderBar, Sidebar, titled
 from ui2.review import ReviewView
 from ui2.views import DashboardView, EnginesView, IngestView, ReportView, SettingsView
@@ -69,7 +76,7 @@ from ui2.workflow import WorkflowMap
 
 __all__ = ["AnalysisWorker", "ExtractionWorker", "TrainingWorker", "ProbeWorker",
            "UpdateWorker", "DownloadWorker", "UpdateDialog", "MainWindow",
-           "create_application"]
+           "create_application", "run_signed_in", "requires"]
 
 LOGGER = logging.getLogger("sif.app2")
 
@@ -96,6 +103,7 @@ NAV_ITEMS = (
     ("review", "Human review"),
     ("analytics", "Analytics"),
     ("engines", "Engines"),
+    ("activity", "Activity"),
     ("settings", "Settings"),
 )
 
@@ -409,13 +417,60 @@ class UpdateDialog(QDialog):
 # ---------------------------------------------------------------------------
 
 
+def requires(permission: str):
+    """Refuse a controller action the signed-in role may not take.
+
+    The check lives on the action, not on the button: a refused action is
+    refused whether it came from a click, a keyboard shortcut, a menu or the
+    workflow map. Buttons are only greyed out as a courtesy.
+
+    Qt passes a signal's arguments to whatever slot it is connected to - a
+    ``clicked`` passes ``checked`` - and a wrapper that took ``*args`` would
+    hand them on to a method that does not want them. So only as many
+    positional arguments as the method itself accepts are passed through,
+    which is what Qt would have done for the unwrapped method.
+    """
+    def decorate(method):
+        signature = inspect.signature(method)
+        positional = [p for p in signature.parameters.values()
+                      if p.kind in (p.POSITIONAL_ONLY, p.POSITIONAL_OR_KEYWORD)]
+        variadic = any(p.kind == p.VAR_POSITIONAL for p in signature.parameters.values())
+        limit = None if variadic else len(positional) - 1        # less self
+
+        @functools.wraps(method)
+        def guarded(self, *args, **kwargs):
+            if not self.permitted(permission, method.__name__):
+                return None
+            if limit is not None:
+                args = args[:limit]
+            return method(self, *args, **kwargs)
+        guarded.permission = permission
+        return guarded
+    return decorate
+
+
 class MainWindow(QMainWindow):
     """Workflow-led console: the map first, then each capability as its own page."""
 
     LOG_REFRESH_MS = 1500
 
-    def __init__(self) -> None:
+    def __init__(self, session: Optional[Session] = None,
+                 accounts: Optional[AccountStore] = None) -> None:
+        """``session`` is who signed in. Without one the window runs unattended.
+
+        The entry points always sign someone in first; building a window with
+        no session is for tests and scripts, and the audit trail records those
+        entries with no user so they cannot be mistaken for a person's work.
+        """
         super().__init__()
+        self.session = session or Session.unattended()
+        self._accounts = accounts
+        #: Actions taken while the window is still being built are the window
+        #: restoring itself, not an operator - they are not permission-checked.
+        self._constructing = True
+        #: Set by File > Sign out, so the entry point shows the sign-in again
+        #: instead of quitting.
+        self.sign_out_requested = False
         self.ring = configure_logging("INFO")
         LOGGER.info("%s (build 2) starting", APP_NAME)
 
@@ -443,7 +498,11 @@ class MainWindow(QMainWindow):
         self.duplicates_seen = 0
         #: What an auditor reads: append-only, separate from the debug log.
         self.audit = AuditLog(version=__version__)
+        if self.session.authenticated:
+            self.audit.sign_in(self.session.username, self.session.role)
         self.audit.system("console started", build="2", version=describe())
+        #: References analysed in the batch now running, for the audit entry.
+        self._batch_refs: List[str] = []
         #: Set in closeEvent, so deferred work started by a timer can stand down.
         self._closing = False
         self.decisions = DecisionLog().load()
@@ -467,6 +526,8 @@ class MainWindow(QMainWindow):
 
         self._refresh_engines()
         self._refresh_workflow()
+        self._apply_role()
+        self._constructing = False
         self.log_timer = QTimer(self)
         self.log_timer.timeout.connect(self._refresh_logs)
         self.log_timer.start(self.LOG_REFRESH_MS)
@@ -484,7 +545,7 @@ class MainWindow(QMainWindow):
         self.sidebar.select("workflow")
 
         self.header = HeaderBar(APP_NAME, "Oil India Limited", "PS 26165",
-                                "HSE Analyst", "Team member")
+                                self.session.full_name, self.session.role_label)
         self.header.search_changed.connect(self._apply_filter)
 
         self.workflow = WorkflowMap()
@@ -503,7 +564,11 @@ class MainWindow(QMainWindow):
                        "here, ranked by how dense the precursors are rather than by how "
                        "many reports the group happens to hold.")
         self.review_view = ReviewView()
-        self.review_view.set_reviewer(str(prefs.get("reviewer", "") or ""))
+        if self.session.authenticated:
+            self.review_view.bind_reviewer(self.session.signature)
+        else:
+            self.review_view.set_reviewer(str(prefs.get("reviewer", "") or ""))
+        self.activity_view = ActivityView()
         self.analytics_view = AnalyticsView()
         self.engines_view = EnginesView()
         self.settings_view = SettingsView()
@@ -529,6 +594,9 @@ class MainWindow(QMainWindow):
                  "What the trained model learned, and how well it scored."),
                 ("engines", self.engines_view, "Intelligence engines",
                  "The encoder, the local LLM, the learned model and MLOps."),
+                ("activity", self.activity_view, "Activity and access",
+                 "Who signed in, what each person did, and whether the record "
+                 "has been altered since."),
                 ("settings", self.settings_view, "Settings",
                  "Preferences, logging and the audit trail.")):
             self._page_index[key] = self.pages.addWidget(titled(widget, title, caption))
@@ -596,6 +664,10 @@ class MainWindow(QMainWindow):
             action.triggered.connect(slot)
             file_menu.addAction(action)
         file_menu.addSeparator()
+        sign_out = QAction(f"Sign &out {self.session.username}", self)
+        sign_out.triggered.connect(self.sign_out)
+        sign_out.setEnabled(self.session.authenticated)
+        file_menu.addAction(sign_out)
         quit_action = QAction("E&xit", self)
         quit_action.setShortcut("Ctrl+Q")
         quit_action.triggered.connect(self.close)
@@ -610,6 +682,12 @@ class MainWindow(QMainWindow):
         help_menu.addAction(about_action)
 
     def _connect(self) -> None:
+        self.activity_view.add_requested.connect(self.add_account)
+        self.activity_view.reset_requested.connect(self.reset_account_password)
+        self.activity_view.role_requested.connect(self.change_account_role)
+        self.activity_view.toggle_requested.connect(self.toggle_account)
+        self.activity_view.verify_requested.connect(self.verify_audit_trail)
+        self.activity_view.filter_changed.connect(lambda _: self._refresh_activity())
         self.ingest_view.analyse_requested.connect(self.analyse_text)
         self.ingest_view.seed_requested.connect(self.load_seed_data)
         self.ingest_view.csv_requested.connect(self.import_csv)
@@ -660,6 +738,188 @@ class MainWindow(QMainWindow):
             self._refresh_engines()
         elif key == "workflow":
             self._refresh_workflow()
+        elif key == "activity":
+            self._refresh_activity()
+
+    # -- who is signed in, and what they may do ------------------------------
+
+    @property
+    def accounts(self) -> Optional[AccountStore]:
+        """The account store, opened on first use - it is only needed here."""
+        if self._accounts is None:
+            try:
+                self._accounts = AccountStore()
+            except AuthError as exc:
+                LOGGER.warning("Accounts unavailable: %s", exc)
+        return self._accounts
+
+    def permitted(self, permission: str, action: str = "") -> bool:
+        """True if the signed-in role may do this; otherwise say so and record it."""
+        if self._constructing or self.session.can(permission):
+            return True
+        words = PERMISSION_WORDS.get(permission, permission)
+        self.audit.functionality("permission refused", attempted=action or permission,
+                                 needs=permission, role=self.session.role)
+        self._set_status(f"Your role ({self.session.role_label}) cannot {words}.")
+        if self.isVisible():
+            QMessageBox.information(
+                self, APP_NAME,
+                f"Your role - {self.session.role_label} - cannot {words}.\n\n"
+                "Ask an administrator if you need this.")
+        return False
+
+    def _apply_role(self) -> None:
+        """Grey out what this role cannot do, so a refusal is rarely needed."""
+        can = self.session.can
+        self.review_view.set_decision_rights(can(DECIDE))
+        self.review_view.clear_queue.setEnabled(can(CLEAR))
+        self.review_view.clear_trail.setEnabled(can(CLEAR))
+        self.engines_view.train_button.setEnabled(can(TRAIN))
+        self.activity_view.set_admin(can(MANAGE_USERS))
+
+    def sign_out(self) -> None:
+        """End this person's session and hand the machine back to the sign-in."""
+        self.audit.functionality("signed out", username=self.session.username,
+                                 session=self.session.session_id)
+        self.sign_out_requested = True
+        self.close()
+
+    def _refresh_activity(self) -> None:
+        """People with their tallies, the filtered trail, and the chain state."""
+        rows = self.audit.rows(limit=0)
+        counts = tally(rows)
+        people = []
+        store = self.accounts
+        for account in (store.accounts() if store else []):
+            row = account.to_row()
+            row.update(counts.get(account.username,
+                                  {"sign_ins": 0, "analysed": 0, "decisions": 0}))
+            row["last_login"] = str(row.get("last_login") or "-").replace("T", " ")
+            row["status"] = ("locked" if row.get("locked") else
+                             "active" if row.get("active") else "disabled")
+            people.append(row)
+        self.activity_view.set_people(people)
+        chosen = str(self.activity_view.filter.currentData() or "")
+        shown = [row for row in rows if not chosen or row.get("user") == chosen]
+        for row in shown:
+            row["user"] = row.get("user") or "(unattended)"
+        self.activity_view.set_activity(shown[:500])
+        report = self.audit.verify()
+        self.activity_view.set_chain(report.summary, report.head, report.intact)
+
+    def verify_audit_trail(self) -> None:
+        """Walk the chain now, and say plainly what it found."""
+        report = self.audit.verify()
+        self.activity_view.set_chain(report.summary, report.head, report.intact)
+        self.audit.system("audit trail verified", intact=report.intact,
+                          entries=report.entries, broken_at=report.broken_at or None)
+        self._set_status(report.summary)
+        if not report.intact and self.isVisible():
+            QMessageBox.warning(
+                self, APP_NAME,
+                f"{report.summary}.\n\nThe record from that entry on can no longer "
+                "be relied on. Keep a copy of the file as it is now, and report it.")
+
+    # -- account management (administrators) ---------------------------------
+
+    @requires(MANAGE_USERS)
+    def add_account(self) -> None:
+        dialog = AccountDialog(self.styleSheet(), self)
+        if dialog.exec() != AccountDialog.DialogCode.Accepted:
+            return
+        username, full_name, role = dialog.values()
+        password = self.create_account(username, full_name, role)
+        if password:
+            self._show_one_time_password(username, password)
+
+    @requires(MANAGE_USERS)
+    def create_account(self, username: str, full_name: str, role: str) -> str:
+        """Create an account with a one-time password; returns that password."""
+        from sif.accounts import temporary_password
+
+        store = self.accounts
+        if store is None:
+            return ""
+        password = temporary_password()
+        try:
+            store.create(username, full_name, role, password,
+                         created_by=self.session.username, must_change=True)
+        except AuthError as exc:
+            QMessageBox.warning(self, APP_NAME, str(exc))
+            return ""
+        self.audit.functionality("account created", username=username.strip().lower(),
+                                 role=role)
+        self._refresh_activity()
+        self._set_status(f"Account {username} created as {ROLE_LABELS[role]}")
+        return password
+
+    @requires(MANAGE_USERS)
+    def reset_account_password(self, username: str) -> str:
+        store = self.accounts
+        if store is None:
+            return ""
+        try:
+            password = store.reset_password(username, by=self.session.username)
+        except AuthError as exc:
+            QMessageBox.warning(self, APP_NAME, str(exc))
+            return ""
+        self.audit.functionality("password reset", username=username)
+        self._refresh_activity()
+        if self.isVisible():
+            self._show_one_time_password(username, password)
+        return password
+
+    @requires(MANAGE_USERS)
+    def change_account_role(self, username: str, role: str = "") -> bool:
+        store = self.accounts
+        account = store.get(username) if store else None
+        if account is None:
+            return False
+        if not role:
+            labels = [ROLE_LABELS[item] for item in ROLES]
+            choice, ok = QInputDialog.getItem(
+                self, APP_NAME, f"Role for {account.full_name}:", labels,
+                ROLES.index(account.role), False)
+            if not ok:
+                return False
+            role = ROLES[labels.index(choice)]
+        try:
+            store.set_role(username, role)
+        except AuthError as exc:
+            QMessageBox.warning(self, APP_NAME, str(exc))
+            return False
+        self.audit.functionality("role changed", username=username, role=role)
+        self._refresh_activity()
+        return True
+
+    @requires(MANAGE_USERS)
+    def toggle_account(self, username: str) -> bool:
+        store = self.accounts
+        account = store.get(username) if store else None
+        if account is None:
+            return False
+        if account.username == self.session.username and account.active:
+            QMessageBox.information(self, APP_NAME,
+                                    "You cannot disable the account you are signed in with.")
+            return False
+        try:
+            store.set_active(username, not account.active)
+        except AuthError as exc:
+            QMessageBox.warning(self, APP_NAME, str(exc))
+            return False
+        self.audit.functionality("account enabled" if account.active else "account disabled",
+                                 username=username)
+        self._refresh_activity()
+        return True
+
+    def _show_one_time_password(self, username: str, password: str) -> None:
+        box = QMessageBox(self)
+        box.setWindowTitle(APP_NAME)
+        box.setText(f"One-time password for {username}:\n\n{password}\n\n"
+                    "Give it to them privately. They choose their own the first "
+                    "time they sign in, and this one stops working.")
+        box.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        box.exec()
 
     def run_stage(self, key: str) -> None:
         """A stage card was pressed on the workflow map."""
@@ -749,6 +1009,7 @@ class MainWindow(QMainWindow):
 
     # -- ingestion ---------------------------------------------------------
 
+    @requires(ANALYSE)
     def analyse_text(self, raw: str) -> None:
         """Analyse whatever is in the ingestion box."""
         blocks = [block.strip() for block in (raw or "").split("\n\n") if block.strip()]
@@ -758,6 +1019,7 @@ class MainWindow(QMainWindow):
             return
         self._start(self._analysis_worker(texts=blocks))
 
+    @requires(ANALYSE)
     def load_seed_data(self) -> None:
         """Load and analyse the five seed incidents."""
         self.ingest_view.input_box.setPlainText("\n\n".join(SEED_REPORTS))
@@ -765,6 +1027,7 @@ class MainWindow(QMainWindow):
         self.navigate("ingest")
         self._start(self._analysis_worker(texts=list(SEED_REPORTS), references=references))
 
+    @requires(ANALYSE)
     def import_csv(self) -> None:
         """Analyse every row of a CSV export."""
         path, _ = QFileDialog.getOpenFileName(self, "Import UA/UC reports", os.getcwd(),
@@ -772,6 +1035,7 @@ class MainWindow(QMainWindow):
         if path:
             self._start(self._analysis_worker(csv_path=path))
 
+    @requires(ANALYSE)
     def add_documents(self) -> None:
         """Extract text from PDFs, scans and photographs."""
         paths, _ = QFileDialog.getOpenFileNames(self, "Add report documents", os.getcwd(),
@@ -786,6 +1050,7 @@ class MainWindow(QMainWindow):
             f"Read {count} document(s); {len(self.pending_blocks)} block(s) ready to analyse"))
         self._start(worker, "Extracting document text")
 
+    @requires(ANALYSE)
     def analyse_extracted(self) -> None:
         """Analyse the blocks recovered from documents."""
         if not self.pending_blocks:
@@ -811,6 +1076,7 @@ class MainWindow(QMainWindow):
             self.ingest_view.set_preview(str(document.get("_text", ""))[:6000])
             self._set_status(f"Showing the text extracted from {document.get('name', '')}")
 
+    @requires(ANALYSE)
     def analyse_document(self, index: int) -> None:
         """Analyse only the blocks that came from one document."""
         if not 0 <= index < len(self.documents):
@@ -827,6 +1093,7 @@ class MainWindow(QMainWindow):
         references = [f"{stem}-{number:02d}" for number in range(1, len(blocks) + 1)]
         self._start(self._analysis_worker(texts=blocks, references=references))
 
+    @requires(ANALYSE)
     def remove_document(self, index: int) -> None:
         """Drop one document and its blocks, leaving the rest of the list alone."""
         if not 0 <= index < len(self.documents):
@@ -851,6 +1118,7 @@ class MainWindow(QMainWindow):
         return AnalysisWorker(self.pipeline, translator=translator, language=self.language,
                               parent=self, **kwargs)
 
+    @requires(ANALYSE)
     def export_csv(self) -> None:
         """Write the incident matrix to CSV."""
         if not self.rows:
@@ -878,6 +1146,7 @@ class MainWindow(QMainWindow):
         self.audit.functionality("corpus exported", rows=len(self.rows), path=path)
         self._set_status(f"Exported {len(self.rows)} rows to {path}")
 
+    @requires(ANALYSE)
     def generate_bulletin(self) -> None:
         """Write an auto-generated safety bulletin over the analysed corpus.
 
@@ -914,6 +1183,7 @@ class MainWindow(QMainWindow):
                                  path=path)
         self._set_status(f"Safety bulletin written to {path}")
 
+    @requires(CLEAR)
     def confirm_clear_corpus(self) -> None:
         """Ask before dropping the corpus - it cannot be undone from here."""
         if not self.rows:
@@ -927,6 +1197,7 @@ class MainWindow(QMainWindow):
         if answer == QMessageBox.StandardButton.Yes:
             self.clear_corpus()
 
+    @requires(CLEAR)
     def clear_corpus(self) -> None:
         """Drop every analysed report, so a fresh corpus starts empty."""
         self.rows.clear()
@@ -938,6 +1209,7 @@ class MainWindow(QMainWindow):
         self._refresh()
         self._set_status("Corpus cleared - no reports are loaded.")
 
+    @requires(ANALYSE)
     def clear_documents(self) -> None:
         """Drop the extraction list."""
         self.documents.clear()
@@ -949,6 +1221,7 @@ class MainWindow(QMainWindow):
 
     # -- engine configuration ----------------------------------------------
 
+    @requires(ANALYSE)
     def change_language(self, language: str) -> None:
         """Rebuild the extractor for a different OCR language."""
         self.language = language
@@ -962,12 +1235,14 @@ class MainWindow(QMainWindow):
         self.engines_view.set_ocr_status(status)
         self._refresh_workflow()
 
+    @requires(ANALYSE)
     def set_translation(self, enabled: bool) -> None:
         """Turn pre-analysis translation on or off."""
         self.translate_enabled = enabled
         LOGGER.info("Translation %s", "enabled" if enabled else "disabled")
         self._refresh_workflow()
 
+    @requires(CONFIGURE)
     def set_llm_enabled(self, enabled: bool) -> None:
         """Attach or detach the local LLM as an extra analyser."""
         self.llm_enabled = enabled
@@ -975,6 +1250,7 @@ class MainWindow(QMainWindow):
         LOGGER.info("Local LLM analyser %s", "enabled" if enabled else "disabled")
         self._refresh_workflow()
 
+    @requires(CONFIGURE)
     def configure_llm(self, host: str, model: str) -> None:
         """Point the client at a different host or model."""
         self.llm = OllamaEngine(host=host.strip() or self.llm.host,
@@ -986,6 +1262,7 @@ class MainWindow(QMainWindow):
         LOGGER.info("Ollama configured: %s / %s", self.llm.host, self.llm.model)
         self.check_llm()
 
+    @requires(CONFIGURE)
     def change_encoder(self, backend: str) -> None:
         """Rebuild the pipeline around a different encoder."""
         llm = self.llm if self.llm_enabled else None
@@ -999,6 +1276,7 @@ class MainWindow(QMainWindow):
             f"Encoder set to '{backend}' - it loads on the next run.")
         self._set_status(f"Encoder set to '{backend}'.")
 
+    @requires(CONFIGURE)
     def check_ocr(self) -> None:
         """Fetch the OCR models if this machine lacks them, then prove they load.
 
@@ -1033,6 +1311,7 @@ class MainWindow(QMainWindow):
 
     MIN_HUMAN_LABELS = 8
 
+    @requires(TRAIN)
     def train_model(self) -> None:
         """Train the learned model, on reviewed decisions when there are enough.
 
@@ -1157,6 +1436,7 @@ class MainWindow(QMainWindow):
             return
         self.worker = worker
         if isinstance(worker, AnalysisWorker):
+            self._batch_refs = []
             worker.row_ready.connect(self.on_row_ready)
             worker.progress.connect(self.ingest_view.set_progress)
             worker.status.connect(self._set_status)
@@ -1203,12 +1483,18 @@ class MainWindow(QMainWindow):
         decide where an asset team spends its week. A repeat now replaces the row
         it repeats, keeping that row's reference and position.
         """
+        # Who analysed this report, and when. Carried on the row, so the
+        # evidence panel and the CSV export both say it.
+        payload["analysed_by"] = (self.session.signature if self.session.authenticated
+                                  else "")
+        payload["analysed_at"] = datetime.now().isoformat(timespec="seconds")
         key = self._narrative_key(payload.get("raw_text", ""))
         existing = self._narrative_index().get(key)
         if existing is not None and existing < len(self.rows):
             payload["reference"] = (self.rows[existing].get("reference")
                                     or payload.get("reference") or "")
             self.rows[existing] = payload
+            self._batch_refs.append(str(payload["reference"]))
             self.duplicates_seen += 1
             self.report_view.table.set_rows(self.rows)
             return
@@ -1219,6 +1505,7 @@ class MainWindow(QMainWindow):
             payload["reference"] = f"REP-{len(self.rows) + 1:04d}"
         self._by_narrative[key] = len(self.rows)
         self.rows.append(payload)
+        self._batch_refs.append(str(payload["reference"]))
         self.report_view.table.append_row(payload)
         # Refreshing every fifth row re-aggregated the whole corpus and repainted
         # four charts mid-run, which cost more per report than analysing it. The
@@ -1237,8 +1524,13 @@ class MainWindow(QMainWindow):
     def on_analysis_completed(self, count: int) -> None:
         """A batch finished."""
         intelligence = self._refresh()
+        # Which reports, by reference - so the trail answers "who analysed
+        # NM-2604?" and not only "someone analysed eighteen reports".
+        refs = self._batch_refs
         self.audit.functionality(
             "reports analysed", count=count, corpus=len(self.rows),
+            references=", ".join(refs[:40]) + (f" (+{len(refs) - 40} more)"
+                                               if len(refs) > 40 else ""),
             sif_potential=intelligence.kpis.get("sif_potential"),
             awaiting_review=self.outstanding_reviews,
             duplicates_replaced=self.duplicates_seen or None,
@@ -1452,6 +1744,7 @@ class MainWindow(QMainWindow):
             decision["decision_label"] = DECISION_LABELS.get(entry.decision, entry.decision)
         self.review_view.set_case(self.rows[position - 1], decision)
 
+    @requires(CLEAR)
     def confirm_clear_trail(self) -> None:
         """Ask before erasing the decision trail, and say what it costs.
 
@@ -1486,6 +1779,7 @@ class MainWindow(QMainWindow):
         self._refresh()
         self._set_status(f"Cleared the decision trail - {discarded} decision(s) discarded")
 
+    @requires(CLEAR)
     def confirm_clear_queue(self) -> None:
         """Ask before emptying the review queue, and say what survives it.
 
@@ -1518,6 +1812,7 @@ class MainWindow(QMainWindow):
         self._set_status(f"Cleared the review queue - {analysed} analysed report(s) "
                          f"dropped. The decision trail is untouched.")
 
+    @requires(DECIDE)
     def record_decision(self, decision: str, note: str) -> None:
         """The reviewer called the selected report."""
         row = self.review_view.current_row()
@@ -1527,7 +1822,10 @@ class MainWindow(QMainWindow):
         result = self._result_at(position)
         if result is None:
             return
-        reviewer = self.review_view.reviewer.text().strip()
+        # Signed in, the decision is the signed-in person's - the box cannot be
+        # edited and is not read. Unattended, the typed name is all there is.
+        reviewer = (self.session.signature if self.session.authenticated
+                    else self.review_view.reviewer.text().strip())
         entry = self.decisions.record(result, decision, reviewer=reviewer, note=note)
         if not self.decisions.saved:
             QMessageBox.warning(
@@ -1547,6 +1845,7 @@ class MainWindow(QMainWindow):
             + ("  ·  overturns the engine" if entry.overturns_engine else "")
             + f"  ·  {self.outstanding_reviews} left to review")
 
+    @requires(DECIDE)
     def undo_decision(self) -> None:
         """Withdraw the most recent decision - for the misclick."""
         entry = self.decisions.undo()
@@ -1561,6 +1860,7 @@ class MainWindow(QMainWindow):
             f"Withdrew the {DECISION_LABELS[entry.decision].lower()} decision on "
             f"{entry.reference or 'a report'}")
 
+    @requires(DECIDE)
     def export_decisions(self) -> None:
         """Write the decision trail out for an auditor."""
         if not self.decisions.entries:
@@ -1659,6 +1959,7 @@ class MainWindow(QMainWindow):
             note += "  ·  MEMORY ONLY - the trail could not be written to disk"
         self.settings_view.set_audit_rows(rows, note)
 
+    @requires(MANAGE_USERS)
     def export_audit(self) -> None:
         """Write the audit trail out for an auditor."""
         if not self.audit.counts()["total"]:
@@ -1749,3 +2050,33 @@ def create_application(argv: Optional[List[str]] = None) -> QApplication:
     app.setApplicationName(f"{APP_NAME} build 2")
     app.setOrganizationName("Oil India Limited")
     return app
+
+
+def run_signed_in(application: QApplication, build_window, stylesheet: str = "") -> int:
+    """Sign someone in, run the console for them, and repeat after a sign-out.
+
+    Both entry points run through here, so neither can open the console
+    without a person signed in. ``build_window(session, accounts)`` builds the
+    window for that person; ``stylesheet`` dresses the sign-in page to match.
+    """
+    from ui2.login import LoginDialog
+
+    try:
+        store = AccountStore()
+    except AuthError as exc:
+        QMessageBox.critical(None, APP_NAME, f"{exc}\n\nThe console will not start "
+                             "without its accounts file, rather than risk offering "
+                             "to create a new administrator over it.")
+        return 1
+    audit = AuditLog(version=__version__)
+    code = 0
+    while True:
+        dialog = LoginDialog(store, audit, stylesheet)
+        if dialog.exec() != LoginDialog.DialogCode.Accepted or dialog.session is None:
+            return code
+        window = build_window(dialog.session, store)
+        window.show()
+        code = application.exec()
+        audit.sign_out()
+        if not window.sign_out_requested:
+            return code

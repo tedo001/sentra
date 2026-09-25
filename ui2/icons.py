@@ -95,6 +95,13 @@ def _settings(paint: QPainter) -> None:
         paint.drawLine(QPointF(x1, y1), QPointF(x2, y2))
 
 
+def _activity(paint: QPainter) -> None:
+    paint.drawEllipse(QRectF(2.5, 2.5, 5.5, 5.5))                # head
+    paint.drawArc(QRectF(1.0, 9.0, 8.5, 8.0), 0, 180 * 16)       # shoulders
+    for y in (4.0, 8.5, 13.0):
+        paint.drawLine(QPointF(11.5, y), QPointF(16.0, y))       # the record
+
+
 #: Nav key -> the routine that draws it.
 PAINTERS: Dict[str, Callable[[QPainter], None]] = {
     "workflow": _workflow,
@@ -105,6 +112,7 @@ PAINTERS: Dict[str, Callable[[QPainter], None]] = {
     "review": _review,
     "analytics": _analytics,
     "engines": _engines,
+    "activity": _activity,
     "settings": _settings,
 }
 

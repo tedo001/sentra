@@ -51,7 +51,7 @@ def _require_pyqt6() -> None:
         raise SystemExit(1)
 
 
-def build_window():
+def build_window(session=None, accounts=None):
     """Construct the console in the deep-navy design.
 
     The palette goes on before the window is built and the style sheet after -
@@ -66,7 +66,7 @@ def build_window():
 
     from main2 import MainWindow
 
-    window = MainWindow()
+    window = MainWindow(session, accounts)
     gov_theme.dress(window)
     return window
 
@@ -77,10 +77,12 @@ def main(argv: list[str] | None = None) -> int:
 
     from main2 import create_application
 
+    from ui import gov_theme
+    from main2 import run_signed_in
+
     app = create_application(argv if argv is not None else sys.argv)
-    window = build_window()
-    window.show()
-    return app.exec()
+    gov_theme.prepare()
+    return run_signed_in(app, build_window, gov_theme.STYLESHEET)
 
 
 if __name__ == "__main__":

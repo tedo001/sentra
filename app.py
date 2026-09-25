@@ -90,12 +90,13 @@ def _require_pyqt6() -> None:
         raise SystemExit(1)
 
 
-def build_window():
-    """Construct the console wearing the black-and-lime skin.
+def build_window(session=None, accounts=None):
+    """Construct the console wearing the black-and-lime skin, for ``session``.
 
     The palette is applied first and the window built second: that order is the
     whole mechanism, because every widget that styles itself reads the palette
-    in its constructor.
+    in its constructor. Without a session the window runs unattended - which
+    :func:`main` never does; it signs someone in first.
     """
     from ui import green_theme
 
@@ -103,7 +104,7 @@ def build_window():
 
     from main2 import MainWindow
 
-    window = MainWindow()
+    window = MainWindow(session, accounts)
     green_theme.dress(window)
     window.setWindowTitle(WINDOW_TITLE)
     return window
@@ -115,10 +116,12 @@ def main(argv: list[str] | None = None) -> int:
 
     from main2 import create_application
 
+    from ui import green_theme
+    from main2 import run_signed_in
+
     application = create_application(argv if argv is not None else sys.argv)
-    window = build_window()
-    window.show()
-    return application.exec()
+    green_theme.prepare()
+    return run_signed_in(application, build_window, green_theme.STYLESHEET)
 
 
 if __name__ == "__main__":

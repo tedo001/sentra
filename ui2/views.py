@@ -400,6 +400,7 @@ class ReportView(QWidget):
             "language": FieldRow("", "Source language", "-", C.ACCENT),
             "model": FieldRow("", "Model P(SIF)", "-", C.PURPLE),
             "llm": FieldRow("", "Local LLM", "-", C.PURPLE),
+            "analysed_by": FieldRow("", "Analysed by", "-", C.TEXT_DIM),
         }
 
         self.evidence = QTextEdit()
@@ -473,6 +474,10 @@ class ReportView(QWidget):
         self.fields["llm"].set_value(
             f"{'SIF' if result.get('llm_flag') else 'not SIF'} - {result.get('llm_rule', '')}"
             if result.get("llm_active") else "not consulted")
+        by = str(result.get("analysed_by") or "")
+        when = str(result.get("analysed_at") or "").replace("T", " ")
+        self.fields["analysed_by"].set_value(
+            f"{by}  ·  {when}" if by else ("unattended session" if when else "-"))
 
         evidence = result.get("evidence", {}) or {}
         cues = "; ".join(evidence.get("lexical_cues", [])) or "none"
