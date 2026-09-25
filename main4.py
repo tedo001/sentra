@@ -104,6 +104,10 @@ class WorkspaceWindow(AdminPages, IngestFlow, HSEPages, MainWindow):
     """Build 2's console behind build 4's two workspaces."""
 
     MIN_WIDTH, MIN_HEIGHT = 1366, 768
+    #: Logo files the title row looks for, first found wins (see ui4.shell).
+    header_logo: Tuple[str, ...] = ()
+    profile_page_class = ProfilePage
+    actions_view_class = ActionsView
 
     def __init__(self, session: Optional[Session] = None,
                  accounts: Optional[AccountStore] = None) -> None:
@@ -136,7 +140,8 @@ class WorkspaceWindow(AdminPages, IngestFlow, HSEPages, MainWindow):
         self.header.hide()
         self.sidebar.hide()
         self.shell_header = WorkspaceHeader(self.workspace, self.session.full_name,
-                                            self.session.role_label, self.session.username)
+                                            self.session.role_label, self.session.username,
+                                            logo_names=self.header_logo)
         self.tab_row = TabRow(self.workspace, self.tabs,
                               badge_key="review" if self.workspace == "hse" else "")
         layout = self.centralWidget().layout()
@@ -163,12 +168,12 @@ class WorkspaceWindow(AdminPages, IngestFlow, HSEPages, MainWindow):
         self._page_index["review"] = self.pages.addWidget(self.review_page)
         self.hotspots_page = self._build_hotspots()
         self._page_index["hotspots"] = self.pages.addWidget(self.hotspots_page)
-        self.profile_view = ProfilePage(self.workspace)
+        self.profile_view = self.profile_page_class(self.workspace)
         self._page_index["profile"] = self.pages.addWidget(self.profile_view)
 
         # Compliance Action Items: the HSE calendar of recurring and corrective work.
         self.actions = ActionStore()
-        self.actions_view = ActionsView()
+        self.actions_view = self.actions_view_class()
         self.actions_view.set_user(self.session.username)
         self.actions_view.set_editable(self.session.can(ANALYSE))
         self.actions_view.period_changed.connect(self._refresh_actions)

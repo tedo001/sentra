@@ -80,10 +80,16 @@ def _short_time(value: object) -> str:
 class AdminPages:
     """Engines, Settings, SysLog, Audit Log, New HSE Login - the design's."""
 
+    engines_page_class = EnginesPage
+    settings_page_class = SettingsPage
+    accounts_page_class = AccountsPage
+    audit_page_class = AuditPage
+    syslog_page_class = SysLogPage
+
     # -- Engines --------------------------------------------------------------------------
 
     def _build_engines(self) -> EnginesPage:
-        page = EnginesPage()
+        page = self.engines_page_class()
         page.check_all_requested.connect(self.check_all_connections)
         page.engine_action.connect(self._engine_action)
         page.train_requested.connect(self.train_model)
@@ -326,7 +332,7 @@ class AdminPages:
     # -- Settings ------------------------------------------------------------------------
 
     def _build_settings(self) -> SettingsPage:
-        page = SettingsPage()
+        page = self.settings_page_class()
         page.setting_changed.connect(self.change_setting)
         page.encoder_changed.connect(self._switch_encoder)
         page.llm_toggled.connect(self.set_llm_enabled)
@@ -385,7 +391,7 @@ class AdminPages:
     # -- New HSE Login -------------------------------------------------------------------
 
     def _build_accounts(self) -> AccountsPage:
-        page = AccountsPage()
+        page = self.accounts_page_class()
         page.create_requested.connect(self.create_hse_account)
         page.role_requested.connect(self.change_account_role)
         page.reset_requested.connect(self.reset_account_password)
@@ -458,7 +464,7 @@ class AdminPages:
     # -- Audit Log ------------------------------------------------------------------------
 
     def _build_audit(self) -> AuditPage:
-        page = AuditPage()
+        page = self.audit_page_class()
         page.verify_requested.connect(self.verify_audit_trail)
         page.export_requested.connect(self.export_audit)
         page.filters_changed.connect(self._refresh_audit_page)
@@ -532,7 +538,7 @@ class AdminPages:
     # -- SysLog ---------------------------------------------------------------------------
 
     def _build_syslog(self) -> SysLogPage:
-        page = SysLogPage()
+        page = self.syslog_page_class()
         page.filters_changed.connect(self._refresh_syslog)
         page.export_requested.connect(self.export_syslog)
         return page

@@ -13,3 +13,10 @@
 PyQt6>=6.5
 numpy>=1.24
 pypdfium2>=4.0
+
+# sentra.py: the local SQL database and vector index (SQLite built in; add a
+# driver such as psycopg for a shared PostgreSQL server), encrypted backups and
+# the S3 / WebDAV backup targets.
+SQLAlchemy>=2.0
+cryptography>=41
+requests>=2.31

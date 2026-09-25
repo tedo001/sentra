@@ -97,6 +97,8 @@ python app2.py       # the same console, deep-navy design
 python app3.py       # the same console, Flowbite admin design
 python app4.py       # two workspaces: HSE workspace and Administration
 python app4.py --present   # everything 1.5x larger - for screenshots on slides
+python sentra.py     # SENTRA: the revamp design, SQL + vector database, cloud backup, gemma2
+python sentra.py --present
 ```
 
 **Organisation logo (app4).** Save the official Oil India Limited logo as
@@ -128,6 +130,39 @@ other.
 | `app2.py` | The same console in near-black navy with a teal accent, icons in the rail. |
 | `app3.py` | The same console in the Flowbite admin design: white cards, grey ground, blue accent. |
 | `app4.py` | The SENTRA HSE application design: a sign-in screen, then one of two workspaces. HSE: Home (what needs you), Ingest (staged files through OCR, extraction and analysis), Dashboard, HSE Review (engine assessment, evidence and reasoning, the human decision), Action Items, Risk Hotspots, Reports, Profile. Administration: Engines, Settings, SysLog, Audit Log (hash-chained, with previous and new values), New HSE Login, Profile. IBM Plex is bundled (SIL OFL). Safety decisions and platform control are separate roles in this build only. |
+| `sentra.py` | The revamp design (Inter and JetBrains Mono bundled, SIL OFL; the official OIL emblem) over build 4's two workspaces, plus: a **local SQL database** that keeps every report, decision, action item and audit entry across sessions (SQLite by default, any SQLAlchemy URL for a shared server); a **vector index** for similar-report search; **encrypted cloud backup** to a synced folder, S3-compatible storage or WebDAV, with verify and restore; and the local LLM `gemma2:latest` switched on from the start, with its state as a button in the title row. Administration gains a *Data & Backup* tab. |
+
+### SENTRA: data, backup and the local LLM
+
+* **Local SQL database.** `sentra.db` (SQLite) sits beside the accounts and the
+  audit trail. Every analysis run, review decision and action item is written to
+  it as it happens, and the next session loads it, so the corpus survives a
+  restart. On *Data & Backup* an administrator can point SENTRA at a shared
+  server instead (`postgresql://user@server/sentra`, with its driver
+  installed); the password is kept in the sealed vault, not in the settings
+  file. **Sync now** pushes this workstation's records and pulls what other
+  workstations stored; records are keyed on content, so syncing twice changes
+  nothing.
+* **Vector database.** Each report's embedding is stored per encoder, and
+  *Find reports like...* returns the closest past reports to any text.
+* **Cloud backup.** One archive holds the database (as portable JSON), the
+  accounts, the hash-chained audit trail, the decisions, the compliance
+  calendar, the settings and the trained model, with a SHA-256 manifest. It is
+  encrypted (Fernet, key from the passphrase by PBKDF2-SHA256) before it leaves
+  the machine, then written to a folder (OneDrive, Google Drive and Dropbox
+  folders sync it to the cloud), to S3-compatible storage (AWS S3, MinIO, R2,
+  Wasabi, B2; requests signed with AWS Signature V4), or to WebDAV (Nextcloud,
+  most NAS boxes). Back up on demand or daily/weekly, keep the newest *n*,
+  verify an archive, or restore one. A restore merges and never deletes; the
+  files are unpacked into a dated `restored/` folder to put in place by hand.
+  **Keep the passphrase somewhere safe: without it a backup cannot be opened.**
+* **gemma2:latest, always on.** SENTRA points the Ollama client at
+  `gemma2:latest` and switches the LLM analyser on at start-up. The button in
+  the title row shows green (ready), amber (checking, or the model is not
+  pulled: `ollama pull gemma2:latest`), red (host not answering; reports are
+  still analysed by the three engines) or grey (switched off by an
+  administrator). Anyone can press it to check again; only an administrator can
+  switch it off, and that choice is kept.
 
 A third skin, white and grey with a blue accent, lives in `ui/light_theme.py`
 and is one line away in `build_window()`.

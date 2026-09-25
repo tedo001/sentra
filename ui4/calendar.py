@@ -87,6 +87,7 @@ class ActionChip(QFrame):
         state = "done" if item.done else "overdue" if item.overdue else "open"
         self.setProperty("state", state)
         self.setProperty("kind", "corrective" if item.action.reference else "")
+        self.setProperty("category", item.action.category)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         text = item.action.title
         if item.done:
@@ -172,6 +173,12 @@ class DayCell(QFrame):
 class ActionsView(QWidget):
     """The calendar page. The window supplies the occurrences for :meth:`period`."""
 
+    #: How many items a month cell shows, and how tall cells are - per view,
+    #: so another build can size its calendar its own way.
+    month_limit = MONTH_LIMIT
+    month_cell_height = MONTH_CELL_HEIGHT
+    week_cell_height = WEEK_CELL_HEIGHT
+
     add_requested = pyqtSignal(str)            # ISO date the new action starts on
     action_requested = pyqtSignal(str, str)    # action id, ISO date of the occurrence
     period_changed = pyqtSignal()
@@ -249,6 +256,7 @@ class ActionsView(QWidget):
         legend = QLabel(f"{REPEAT_MARK} repeats   ·   {DONE_MARK} done   ·   red edge: "
                         "overdue   ·   navy edge: answers a report")
         legend.setObjectName("Faint")
+        self.legend = legend
 
         status = QHBoxLayout()
         status.setSpacing(12)
@@ -271,6 +279,7 @@ class ActionsView(QWidget):
 
         board = QFrame()
         board.setObjectName("Card")
+        self.board = board
         board_layout = QVBoxLayout(board)
         board_layout.setContentsMargins(14, 12, 14, 14)
         board_layout.setSpacing(10)
@@ -375,8 +384,8 @@ class ActionsView(QWidget):
             self.grid.addWidget(label, 0, column)
             self.grid.setColumnStretch(column, 1)
 
-        limit = None if self.mode == "week" else MONTH_LIMIT
-        cell_height = WEEK_CELL_HEIGHT if self.mode == "week" else MONTH_CELL_HEIGHT
+        limit = None if self.mode == "week" else self.month_limit
+        cell_height = self.week_cell_height if self.mode == "week" else self.month_cell_height
         day = first
         while day <= last:
             index = (day - first).days

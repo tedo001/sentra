@@ -385,7 +385,7 @@ QLabel#Pill[tone="warn"] {{ background: #FEF6E0; color: #7A5200; border-color: #
 QLabel#Pill[tone="fail"] {{ background: #FCEDEC; color: #B3261E; border-color: #E7B0AB; }}
 QLabel#Pill[tone="info"] {{ background: #E8EFF7; color: {NAVY}; border-color: #A9C1D9; }}
 QLabel#Pill[tone="dark"] {{ background: #1E2327; color: #FFFFFF; border-color: #1E2327; }}
-QLabel#Pill[tone="engine"] {{
+QLabel#Pill[tone="engine"], QLabel#Pill[tone="engine-sif"] {{
     background: #FFFFFF; color: #3C4043; border: 1px dashed #9A9E99;
     font-family: {MONO}; font-weight: 500;
 }}
@@ -626,6 +626,11 @@ def prepare() -> None:
     from .theme import apply_look, apply_palette
 
     load_fonts()
+    from ui4 import hotspots, kit
+
+    kit.configure()
+    hotspots.SCHEME.clear()
+    hotspots.SCHEME.update(hotspots.SCHEME_DEFAULT)
 
     apply_palette(PALETTE)
     apply_look(table_headers_upper=False, nav_upper=False, nav_numbered=False,

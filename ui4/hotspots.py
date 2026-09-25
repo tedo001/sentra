@@ -45,10 +45,22 @@ INCIDENT_COLUMNS = (
 )
 
 
-def _shade(density: float) -> QColor:
-    """Light grey at no density to near-black at all of it."""
-    light, dark = (213, 216, 218), (43, 47, 51)
+#: How the schematic colours a site. "shade" runs light grey to near-black with
+#: density; "opacity" keeps one grey and lets density set how solid it is, with
+#: the chosen site in the selected colour. A theme's prepare() sets this.
+SCHEME: Dict[str, object] = {"mode": "shade", "light": (213, 216, 218), "dark": (43, 47, 51),
+                             "base": "#6B7280", "selected": "#1E4F7A", "ring": "#1E4F7A"}
+SCHEME_DEFAULT = dict(SCHEME)
+
+
+def _shade(density: float, chosen: bool = False) -> QColor:
+    """A site's fill for its SIF-precursor density."""
     t = max(0.0, min(1.0, density / 100.0))
+    if SCHEME["mode"] == "opacity":
+        colour = QColor(str(SCHEME["selected"] if chosen else SCHEME["base"]))
+        colour.setAlphaF(min(1.0, 0.5 + t))
+        return colour
+    light, dark = SCHEME["light"], SCHEME["dark"]
     return QColor(*(int(a + (b - a) * t) for a, b in zip(light, dark)))
 
 
@@ -109,9 +121,9 @@ class SchematicMap(QWidget):
         label_font.setPixelSize(11)
         for site, point, radius in placed:
             label = str(site.get("label"))
-            painter.setPen(QPen(QColor("#1E4F7A"), 3) if label == self.selected
-                           else Qt.PenStyle.NoPen)
-            painter.setBrush(_shade(float(site.get("density") or 0)))
+            painter.setPen(QPen(QColor(str(SCHEME["ring"])), 3 if SCHEME["mode"] == "shade" else 2)
+                           if label == self.selected else Qt.PenStyle.NoPen)
+            painter.setBrush(_shade(float(site.get("density") or 0), label == self.selected))
             painter.drawEllipse(point, radius, radius)
             painter.setFont(label_font)
             painter.setPen(QColor("#3C4043"))
@@ -119,7 +131,9 @@ class SchematicMap(QWidget):
                              Qt.AlignmentFlag.AlignHCenter,
                              label if len(label) <= 30 else label[:29] + "\u2026")
             self._hits.append((point, radius, label))
-        mono = QFont("IBM Plex Mono")
+        from . import kit
+
+        mono = QFont(kit.MONO_FAMILY)
         mono.setPixelSize(11)
         painter.setFont(mono)
         painter.setPen(QColor("#5F6368"))

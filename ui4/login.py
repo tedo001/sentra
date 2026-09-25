@@ -143,37 +143,40 @@ class WorkspaceLogin(LoginDialog):
         outer.setContentsMargins(0, 0, 0, 0)
         outer.setSpacing(0)
 
-        brand = BrandPanel(str(prefs.get("organisation", "Oil India Limited")),
-                           str(prefs.get("project_code", "PS 26165")))
-        side = QFrame()
-        side.setObjectName("LoginSide")
+        self.error.setObjectName("ErrorText")
+        self.error.setStyleSheet("")
         column = QVBoxLayout()
         column.setSpacing(10)
         column.addWidget(self.pages)
-        self.error.setObjectName("ErrorText")
-        self.error.setStyleSheet("")
         column.addWidget(self.error)
         holder = QWidget()
         holder.setFixedWidth(420)
         holder.setLayout(column)
-        right = QHBoxLayout(side)
-        right.setContentsMargins(40, 40, 40, 40)
-        right.addStretch(1)
-        right.addWidget(holder, 0, Qt.AlignmentFlag.AlignVCenter)
-        right.addStretch(1)
-
-        split = QHBoxLayout()
-        split.setContentsMargins(0, 0, 0, 0)
-        split.setSpacing(0)
-        split.addWidget(brand, 53)
-        split.addWidget(side, 47)
-        outer.addLayout(split)
+        outer.addLayout(self._arrange(holder))
 
         remembered = str(prefs.get("remember_username", "") or "")
         if remembered and hasattr(self, "remember"):
             self.username.setText(remembered)
             self.remember.setChecked(True)
             self.password.setFocus()
+
+    def _arrange(self, form: QWidget):
+        """The two halves: the brand on the left, ``form`` centred on the right."""
+        brand = BrandPanel(str(prefs.get("organisation", "Oil India Limited")),
+                           str(prefs.get("project_code", "PS 26165")))
+        side = QFrame()
+        side.setObjectName("LoginSide")
+        right = QHBoxLayout(side)
+        right.setContentsMargins(40, 40, 40, 40)
+        right.addStretch(1)
+        right.addWidget(form, 0, Qt.AlignmentFlag.AlignVCenter)
+        right.addStretch(1)
+        split = QHBoxLayout()
+        split.setContentsMargins(0, 0, 0, 0)
+        split.setSpacing(0)
+        split.addWidget(brand, 53)
+        split.addWidget(side, 47)
+        return split
 
     # -- pages, laid out as designed ---------------------------------------------------
 

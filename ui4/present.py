@@ -15,7 +15,7 @@ from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 
 __all__ = ["ACTION_WORDS", "age", "case_line", "clock", "day_month", "describe_action",
            "initials", "queued_at", "received", "review_status", "row_when", "stamp",
-           "trigger_counts", "weekly_series"]
+           "trigger_counts", "weekly_series", "weekly_table"]
 
 #: Audit actions as a sentence about a person, for timelines.
 ACTION_WORDS = {
@@ -215,3 +215,31 @@ def weekly_series(rows: Sequence[Dict[str, object]], weeks: int = 13,
               f"weekly · peak {peak} SIF / week",
               f"w/c {end_week.strftime('%d %b').lstrip('0')}")
     return sif, critical, labels
+
+
+def weekly_table(rows: Sequence[Dict[str, object]], weeks: int = 13,
+                 end: Optional[date] = None) -> List[Dict[str, object]]:
+    """Week by week, oldest first: SIF potential, critical (score >= 85) and all reports.
+
+    The span ends at the latest dated report unless ``end`` is given, for the
+    same reason :func:`weekly_series` does.
+    """
+    dated = [(when.date(), row) for when, row in ((row_when(row), row) for row in rows)
+             if when is not None]
+    if not dated:
+        return []
+    last = end or max(day for day, _row in dated)
+    last_week = last - timedelta(days=last.weekday())
+    first_week = last_week - timedelta(weeks=weeks - 1)
+    table = [{"start": first_week + timedelta(weeks=i),
+              "label": (first_week + timedelta(weeks=i)).strftime("%b %d"),
+              "sif": 0, "critical": 0, "reports": 0} for i in range(weeks)]
+    for day, row in dated:
+        index = (day - timedelta(days=day.weekday()) - first_week).days // 7
+        if 0 <= index < weeks:
+            table[index]["reports"] += 1
+            if row.get("sif_potential"):
+                table[index]["sif"] += 1
+            if float(row.get("risk_score") or 0) >= 85:
+                table[index]["critical"] += 1
+    return table

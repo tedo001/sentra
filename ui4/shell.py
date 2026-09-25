@@ -40,9 +40,9 @@ LOGO_DIRECTORY = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__
 LOCKUP_RATIO = 2.2
 
 
-def find_logo(directory: str = "") -> str:
+def find_logo(directory: str = "", names: Sequence[str] = ()) -> str:
     directory = directory or LOGO_DIRECTORY
-    for name in LOGO_NAMES:
+    for name in names or LOGO_NAMES:
         path = os.path.join(directory, name)
         if os.path.isfile(path):
             return path
@@ -119,13 +119,14 @@ class WorkspaceHeader(QFrame):
     def __init__(self, workspace: str, full_name: str, role_label: str,
                  username: str, project: str = "PS 26165",
                  organisation: str = "Oil India Limited",
-                 place: str = "Field HQ Duliajan · Assam") -> None:
+                 place: str = "Field HQ Duliajan · Assam",
+                 logo_names: Sequence[str] = ()) -> None:
         super().__init__()
         self.setObjectName("WorkspaceHeader")
         self.setProperty("workspace", workspace)
         self.setFixedHeight(48 if workspace == "hse" else 51)
 
-        self.logo_path = find_logo()
+        self.logo_path = find_logo(names=logo_names)
         picture = logo_pixmap(self.logo_path, 34) if self.logo_path else None
         self.organisation = _label(organisation, "OrgName")
         if picture is not None:
@@ -213,6 +214,8 @@ class WorkspaceHeader(QFrame):
 
         right = QHBoxLayout()
         right.setSpacing(14)
+        #: The right-hand group, so a build can add to the title row.
+        self.right = right
         right.addWidget(self.project)
         right.addWidget(self.bell)
         right.addWidget(self.gear)

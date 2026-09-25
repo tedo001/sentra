@@ -41,6 +41,12 @@ class HSEPages:
     """Home, Ingest, Dashboard, HSE Review, Risk Hotspots, Profile - the design's."""
 
     _intelligence = None
+    #: The page classes, so another build can lay a page out its own way.
+    home_page_class = HomePage
+    dashboard_page_class = DashboardPage
+    review_page_class = ReviewPage
+    reports_page_class = ReportsPage
+    hotspots_page_class = HotspotsPage
 
     # -- shared reading of the corpus --------------------------------------------
 
@@ -66,7 +72,7 @@ class HSEPages:
     # -- Home -------------------------------------------------------------------------
 
     def _build_home(self) -> HomePage:
-        page = HomePage()
+        page = self.home_page_class()
         page.refresh_requested.connect(self._refresh_home)
         page.review_requested.connect(self.open_case)
         page.report_requested.connect(self.open_report)
@@ -149,7 +155,7 @@ class HSEPages:
         self.review_view.show_decided.blockSignals(True)
         self.review_view.show_decided.setChecked(True)
         self.review_view.show_decided.blockSignals(False)
-        page = ReviewPage()
+        page = self.review_page_class()
         page.case_selected.connect(self._show_case)
         page.decided.connect(self.decide_case)
         page.undo_requested.connect(self.undo_decision)
@@ -268,7 +274,7 @@ class HSEPages:
     # -- Reports ---------------------------------------------------------------------------
 
     def _build_reports(self) -> ReportsPage:
-        page = ReportsPage()
+        page = self.reports_page_class()
         page.report_selected.connect(self._show_report)
         page.case_requested.connect(self.open_case)
         page.action_requested.connect(self._raise_action)
@@ -313,7 +319,7 @@ class HSEPages:
     # -- Risk Hotspots ------------------------------------------------------------------
 
     def _build_hotspots(self) -> HotspotsPage:
-        page = HotspotsPage()
+        page = self.hotspots_page_class()
         self._hotspot_site = ""
         page.filters_changed.connect(self._refresh_hotspots)
         page.site_chosen.connect(self._choose_site)
@@ -407,7 +413,7 @@ class HSEPages:
     # -- Dashboard ---------------------------------------------------------------------
 
     def _build_dashboard(self) -> DashboardPage:
-        page = DashboardPage()
+        page = self.dashboard_page_class()
         page.period_changed.connect(lambda _key: self._refresh_dashboard())
         page.filter_changed.connect(self._refresh_dashboard)
         page.export_requested.connect(self.export_csv)
@@ -457,6 +463,8 @@ class HSEPages:
                                      "an imported history reads as it was, not as empty weeks.")
 
         picked = [rows[index] for index in chosen]
+        #: The rows behind the figures, for a subclass that draws more of them.
+        self._dashboard_rows = picked
         total = len(picked)
         sif = sum(1 for row in picked if row.get("sif_potential"))
         risks = [float(row.get("risk_score") or 0) for row in picked]
@@ -562,6 +570,8 @@ class IngestFlow:
     many reports it produced, its text and a processing log.
     """
 
+    ingest_page_class = IngestPage
+
     def _build_ingest(self) -> IngestPage:
         from sif.ocr import LANGUAGE_CHOICES
 
@@ -570,7 +580,7 @@ class IngestFlow:
         self._ingest_selected = -1
         self.analyse_after_extraction = True
         self.csv_rows_as_reports = True
-        page = IngestPage(LANGUAGE_CHOICES)
+        page = self.ingest_page_class(LANGUAGE_CHOICES)
         page.files_chosen.connect(self.stage_files)
         page.process_requested.connect(self.start_processing)
         page.narrative_submitted.connect(self.submit_narrative)

@@ -240,7 +240,7 @@ class CaseView(QWidget):
         self.pills.addWidget(Pill(f"ENGINE · {'▲ ' if risk >= 85 else ''}{band} {risk:.0f}",
                                   "engine"))
         self.pills.addWidget(Pill("ENGINE · " + ("SIF potential" if row.get("sif_potential")
-                                                      else "not SIF"), "engine"))
+                                                      else "not SIF"), "engine-sif"))
         if status[0]:
             self.pills.addWidget(Pill(*status))
         trigger = str(row.get("review_trigger") or "")

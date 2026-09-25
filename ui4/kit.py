@@ -41,7 +41,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-__all__ = ["AlertRow", "BarList", "Card", "Col", "DesignTable", "KeyValues", "LineChart",
+__all__ = ["AlertRow", "BarList", "configure", "Card", "Col", "DesignTable", "KeyValues", "LineChart",
            "Page", "PageHead", "Pill", "Segmented", "StatCell", "StatStrip", "TabbedCard",
            "Timeline", "TONES", "clear_layout", "link_button", "risk_colour", "scrolling"]
 
@@ -54,6 +54,16 @@ NAVY = "#1E4F7A"
 RED = "#B3261E"
 BAR = "#44515A"
 TRACK = "#E9EAE6"
+MONO_FAMILY = "IBM Plex Mono"
+#: Figures: the note under the value (the revamp) instead of beside it.
+STAT_STACKED = False
+#: Risk cells: the score itself in red at critical, as well as its bar.
+RISK_NUMBER_RED = False
+#: Page heads: the caption under the title (the revamp) instead of beside it.
+HEAD_STACKED = False
+#: (lowest score, colour) from the top down; the last entry takes everything else.
+RISK_STEPS: List[Tuple[float, str]] = [(85, "#B3261E"), (70, "#8E3B12"), (40, "#9A6A00"),
+                                       (0, "#4F7A5A")]
 
 #: tone -> (fill, text, border)
 TONES: Dict[str, Tuple[str, str, str]] = {
@@ -64,18 +74,46 @@ TONES: Dict[str, Tuple[str, str, str]] = {
     "grey": ("#EEEEEB", "#45484D", "#D2D3CE"),
     "dark": ("#1E2327", "#FFFFFF", "#1E2327"),
     "engine": ("#FFFFFF", "#3C4043", "#9A9E99"),
+    "engine-sif": ("#FFFFFF", "#3C4043", "#9A9E99"),
+}
+
+#: The values above as the design sheets set them - what configure() resets to.
+DEFAULTS: Dict[str, object] = {
+    "TEXT": TEXT, "MUTED": MUTED, "FAINT": FAINT, "LINE": LINE, "HAIR": HAIR, "NAVY": NAVY,
+    "RED": RED, "BAR": BAR, "TRACK": TRACK, "MONO_FAMILY": MONO_FAMILY,
+    "STAT_STACKED": STAT_STACKED, "RISK_NUMBER_RED": RISK_NUMBER_RED,
+    "HEAD_STACKED": HEAD_STACKED, "RISK_STEPS": list(RISK_STEPS), "TONES": dict(TONES),
 }
 
 
+def configure(**tokens: object) -> None:
+    """Set the drawn parts' colours and mono face; unnamed tokens go back to default.
+
+    A theme's ``prepare()`` calls this, so whichever build is running draws its
+    own pills, bars and lines, and building one never leaves another's colours.
+    """
+    unknown = set(tokens) - set(DEFAULTS)
+    if unknown:
+        raise KeyError(f"Unknown kit token(s): {sorted(unknown)}")
+    values = {**DEFAULTS, **tokens}
+    module = globals()
+    for name, value in values.items():
+        if name == "TONES":
+            TONES.clear()
+            TONES.update(DEFAULTS["TONES"])
+            TONES.update(value)
+        elif name == "RISK_STEPS":
+            RISK_STEPS[:] = list(value)
+        else:
+            module[name] = value
+
+
 def risk_colour(score: float) -> str:
-    """The risk bar's colour: red at critical, rust, ochre, then a quiet green."""
-    if score >= 85:
-        return RED
-    if score >= 70:
-        return "#8E3B12"
-    if score >= 40:
-        return "#9A6A00"
-    return "#4F7A5A"
+    """The risk bar's colour, stepping down from critical."""
+    for floor, colour in RISK_STEPS:
+        if score >= floor:
+            return colour
+    return RISK_STEPS[-1][1]
 
 
 def clear_layout(layout) -> None:
@@ -132,8 +170,15 @@ class PageHead(QWidget):
         layout = QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(12)
-        layout.addWidget(self.title, 0, Qt.AlignmentFlag.AlignVCenter)
-        layout.addWidget(self.caption, 1, Qt.AlignmentFlag.AlignVCenter)
+        if HEAD_STACKED:
+            words = QVBoxLayout()
+            words.setSpacing(2)
+            words.addWidget(self.title)
+            words.addWidget(self.caption)
+            layout.addLayout(words, 1)
+        else:
+            layout.addWidget(self.title, 0, Qt.AlignmentFlag.AlignVCenter)
+            layout.addWidget(self.caption, 1, Qt.AlignmentFlag.AlignVCenter)
         layout.addLayout(self.actions)
 
     def add(self, widget: QWidget) -> QWidget:
@@ -262,12 +307,16 @@ class StatCell(QFrame):
         row.setSpacing(8)
         row.addWidget(self.alert, 0, Qt.AlignmentFlag.AlignBaseline)
         row.addWidget(self.value, 0, Qt.AlignmentFlag.AlignBaseline)
-        row.addWidget(self.note, 1, Qt.AlignmentFlag.AlignBaseline)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(16, 10, 16, 10)
         layout.setSpacing(2)
         layout.addWidget(self.label)
         layout.addLayout(row)
+        if STAT_STACKED:
+            row.addStretch(1)
+            layout.addWidget(self.note)
+        else:
+            row.addWidget(self.note, 1, Qt.AlignmentFlag.AlignBaseline)
 
     def set(self, value: object, note: str = "", *, alert: bool = False) -> None:
         self.value.setText(str(value))
@@ -395,7 +444,7 @@ class _CellDelegate(QStyledItemDelegate):
             score = float(payload or 0.0)
             font.setWeight(QFont.Weight.DemiBold)
             painter.setFont(font)
-            painter.setPen(QColor(TEXT))
+            painter.setPen(QColor(RED if RISK_NUMBER_RED and score >= 85 else TEXT))
             number = QRectF(rect.left(), rect.top(), 30, rect.height())
             painter.drawText(number, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignRight,
                              f"{score:.0f}")
@@ -442,7 +491,7 @@ class DesignTable(QTableWidget):
         self.rows: List[Dict[str, object]] = []
         self.wrap = wrap
         self.row_height = row_height
-        self.mono_family = "IBM Plex Mono"
+        self.mono_family = MONO_FAMILY
         self.setHorizontalHeaderLabels([column.title for column in self.columns])
         self.verticalHeader().setVisible(False)
         self.verticalHeader().setDefaultSectionSize(row_height)
@@ -540,11 +589,11 @@ class BarList(QWidget):
 
     ROW = 25
 
-    def __init__(self, *, label_ratio: float = 0.42, tone: str = BAR) -> None:
+    def __init__(self, *, label_ratio: float = 0.42, tone: str = "") -> None:
         super().__init__()
         self.items: List[Tuple[str, float, str]] = []
         self.label_ratio = label_ratio
-        self.tone = tone
+        self.tone = tone or BAR
         self.empty = "Nothing to show yet."
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
 
@@ -659,7 +708,7 @@ class LineChart(QWidget):
                         path.lineTo(point)
                 painter.setBrush(Qt.BrushStyle.NoBrush)
                 painter.drawPath(path)
-        mono = QFont("IBM Plex Mono")
+        mono = QFont(MONO_FAMILY)
         mono.setPixelSize(12)
         painter.setFont(mono)
         painter.setPen(QColor(MUTED))
