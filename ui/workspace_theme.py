@@ -194,8 +194,8 @@ QFrame#Panel, QFrame#Card, QFrame#Tile {{
     border: 1px solid {LINE};
     border-radius: 3px;
 }}
-QLabel#PageTitle {{ font-size: 21px; font-weight: 600; }}
-QLabel#SectionTitle {{ font-size: 15px; font-weight: 600; color: #1F2328; }}
+QLabel#PageTitle {{ font-size: 24px; font-weight: 600; }}
+QLabel#SectionTitle {{ font-size: 19px; font-weight: 600; color: #1F2328; }}
 QLabel#Caption {{
     font-family: {MONO};
     font-size: 10px;
