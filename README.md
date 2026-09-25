@@ -36,6 +36,30 @@ in this design; `app2.py` runs the same window in a deep-navy one.*
 >
 > **Building the installer:** [packaging/INNO_SETUP.md](packaging/INNO_SETUP.md)
 > — PyInstaller and Inno Setup, step by step, and how to publish a release.
+>
+> **Architecture, test and gap report:** [reports/report.pdf](reports/report.pdf)
+> — how the engine decides, the models and data, every test result, and what is
+> still missing.
+
+## Sign-in and a record of who did what
+
+Every session begins with a sign-in, and everything the console records carries
+the account that did it: each analysed report says who analysed it, each review
+decision is recorded under the signed-in person, and the audit trail names the
+user on every entry.
+
+| | |
+| --- | --- |
+| ![Sign in](docs/access-signin.png) | ![Activity](docs/access-activity.png) |
+
+* **No default password.** The first start on a machine creates the administrator.
+* **Four roles** — Viewer, HSE Analyst, HSE Expert, Administrator — each able to do
+  everything the one before can. The check is on the action, not the button.
+* **Passwords are never stored** — a salted PBKDF2-HMAC-SHA256 digest at 600,000
+  iterations. Five wrong attempts lock an account for five minutes.
+* **A tamper-evident trail.** Each audit entry carries the hash of the one before
+  it; the Activity page shows whether the chain is intact and where it broke.
+
 
 ## Run it
 
@@ -475,10 +499,10 @@ On a headless machine prefix with `QT_QPA_PLATFORM=offscreen`, and with
 `SIF_ENCODER=hashing` to pin the offline encoder so the run needs no model
 download and is deterministic.
 
-**290 tests.** They cover every pipeline stage and the fusion guards, the MLOps
+**322 tests.** They cover every pipeline stage and the fusion guards, the MLOps
 round-trip, document extraction and the OCR model cache, the local LLM's
 readiness and model-name handling, the review bench and its decision trail, the
-update checker and the release pipeline — and the interface itself, driven
+update checker and the release pipeline, sign-in, roles and the audit chain — and the interface itself, driven
 headless against the real `samples/` files from import through review to a
 trained model.
 

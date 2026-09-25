@@ -1,0 +1,118 @@
+{
+ "eval42": {
+  "n": 42,
+  "tp": 25,
+  "fp": 0,
+  "fn": 0,
+  "tn": 17,
+  "precision": 1.0,
+  "recall": 1.0,
+  "f1": 1.0,
+  "rule_accuracy": 0.96,
+  "queued": 42
+ },
+ "train56": {
+  "n": 56,
+  "tp": 33,
+  "fp": 0,
+  "fn": 0,
+  "tn": 23,
+  "precision": 1.0,
+  "recall": 1.0,
+  "f1": 1.0,
+  "rule_accuracy": 0.879,
+  "queued": 56
+ },
+ "ms_per_report": 2.76,
+ "reports_per_minute": 21739,
+ "model": {
+  "samples": 56,
+  "positives": 33,
+  "cv_folds": null,
+  "metrics": {
+   "accuracy": 1.0,
+   "precision": 1.0,
+   "recall": 1.0,
+   "f1": 1.0,
+   "roc_auc": 1.0
+  },
+  "top_features": [
+   [
+    "p_sif",
+    0.759
+   ],
+   [
+    "barrier_criticality",
+    0.143
+   ],
+   [
+    "lexical_flag",
+    0.091
+   ],
+   [
+    "barrier_failed",
+    0.006
+   ],
+   [
+    "n_chars",
+    0.001
+   ]
+  ],
+  "warnings": [
+   "Small corpus (56 reports, 23 in the minority class): regularisation relaxed so the trees can split. Metrics from this few samples are indicative only."
+  ]
+ },
+ "features": 46,
+ "loc": {
+  "sif/__init__.py": 35,
+  "sif/accounts.py": 422,
+  "sif/audit.py": 400,
+  "sif/encoders.py": 228,
+  "sif/evidence.py": 87,
+  "sif/heads.py": 376,
+  "sif/lexical.py": 1013,
+  "sif/llm.py": 351,
+  "sif/logging_setup.py": 185,
+  "sif/mlops.py": 539,
+  "sif/narrative.py": 270,
+  "sif/ocr.py": 643,
+  "sif/paths.py": 51,
+  "sif/patterns.py": 153,
+  "sif/pipeline.py": 390,
+  "sif/prefs.py": 73,
+  "sif/preprocessing.py": 153,
+  "sif/prototypes.py": 218,
+  "sif/review.py": 465,
+  "sif/scoring.py": 103,
+  "sif/updater.py": 347,
+  "sif/version.py": 80,
+  "ui/__init__.py": 11,
+  "ui/charts.py": 211,
+  "ui/components.py": 621,
+  "ui/gov_theme.py": 398,
+  "ui/green_theme.py": 471,
+  "ui/light_theme.py": 458,
+  "ui/theme.py": 412,
+  "ui/views.py": 832,
+  "ui2/__init__.py": 19,
+  "ui2/activity.py": 265,
+  "ui2/components.py": 315,
+  "ui2/icons.py": 158,
+  "ui2/login.py": 273,
+  "ui2/review.py": 668,
+  "ui2/views.py": 815,
+  "ui2/workflow.py": 194,
+  "main2.py": 2082,
+  "main.py": 883,
+  "app.py": 128,
+  "app2.py": 89,
+  "train_model.py": 199
+ },
+ "test_loc": {
+  "test_access.py": 456,
+  "test_app2.py": 1225,
+  "test_functional.py": 1335,
+  "test_release.py": 317,
+  "test_sif.py": 1248
+ }
+}

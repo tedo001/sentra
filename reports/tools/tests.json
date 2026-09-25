@@ -1,0 +1,2259 @@
+{
+ "total_seconds": 63.1,
+ "records": [
+  {
+   "id": "test_access.TestAccounts.test_a_disabled_account_cannot_sign_in",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.006,
+   "doc": ""
+  },
+  {
+   "id": "test_access.TestAccounts.test_a_lockout_ends_by_itself",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.003,
+   "doc": ""
+  },
+  {
+   "id": "test_access.TestAccounts.test_a_one_time_password_works_once_then_must_be_replaced",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.009,
+   "doc": ""
+  },
+  {
+   "id": "test_access.TestAccounts.test_a_right_password_signs_in_and_names_the_person",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.003,
+   "doc": ""
+  },
+  {
+   "id": "test_access.TestAccounts.test_a_wrong_password_and_an_unknown_user_read_the_same",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.003,
+   "doc": "Different messages would tell a stranger which usernames exist."
+  },
+  {
+   "id": "test_access.TestAccounts.test_an_unreadable_file_is_an_error_not_an_empty_store",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.002,
+   "doc": "Reading it as empty would offer to create an administrator over it."
+  },
+  {
+   "id": "test_access.TestAccounts.test_each_role_can_do_everything_the_one_before_can",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.001,
+   "doc": ""
+  },
+  {
+   "id": "test_access.TestAccounts.test_five_wrong_passwords_lock_the_account",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.007,
+   "doc": ""
+  },
+  {
+   "id": "test_access.TestAccounts.test_saving_leaves_no_half_written_file",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.002,
+   "doc": ""
+  },
+  {
+   "id": "test_access.TestAccounts.test_the_last_administrator_cannot_be_removed",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.003,
+   "doc": ""
+  },
+  {
+   "id": "test_access.TestAccounts.test_the_password_itself_is_never_written",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.001,
+   "doc": ""
+  },
+  {
+   "id": "test_access.TestAccounts.test_two_accounts_with_one_password_store_different_digests",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.002,
+   "doc": ""
+  },
+  {
+   "id": "test_access.TestAccounts.test_what_is_refused_at_creation",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.002,
+   "doc": ""
+  },
+  {
+   "id": "test_access.TestSignInAndAttribution.test_a_decision_is_recorded_under_the_signed_in_person_only",
+   "status": "pass",
+   "detail": "",
+   "seconds": 2.997,
+   "doc": ""
+  },
+  {
+   "id": "test_access.TestSignInAndAttribution.test_a_guarded_action_still_accepts_a_signal_argument",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.168,
+   "doc": "clicked(bool) hands a slot an extra argument; the guard must drop it."
+  },
+  {
+   "id": "test_access.TestSignInAndAttribution.test_a_one_time_password_leads_to_choosing_a_real_one",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.011,
+   "doc": ""
+  },
+  {
+   "id": "test_access.TestSignInAndAttribution.test_a_refused_sign_in_is_recorded_with_the_name_that_was_tried",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.006,
+   "doc": ""
+  },
+  {
+   "id": "test_access.TestSignInAndAttribution.test_a_viewer_is_refused_and_the_refusal_is_recorded",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.116,
+   "doc": ""
+  },
+  {
+   "id": "test_access.TestSignInAndAttribution.test_an_analyst_can_analyse_but_not_decide_or_clear",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.169,
+   "doc": ""
+  },
+  {
+   "id": "test_access.TestSignInAndAttribution.test_every_analysed_report_names_who_analysed_it",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.155,
+   "doc": ""
+  },
+  {
+   "id": "test_access.TestSignInAndAttribution.test_first_run_creates_the_administrator_and_signs_them_in",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.01,
+   "doc": ""
+  },
+  {
+   "id": "test_access.TestSignInAndAttribution.test_only_an_administrator_manages_accounts",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.29,
+   "doc": ""
+  },
+  {
+   "id": "test_access.TestSignInAndAttribution.test_signing_out_is_recorded_and_hands_back_to_sign_in",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.158,
+   "doc": ""
+  },
+  {
+   "id": "test_access.TestSignInAndAttribution.test_the_activity_page_tallies_each_person",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.203,
+   "doc": ""
+  },
+  {
+   "id": "test_access.TestSignInAndAttribution.test_the_entry_point_will_not_open_without_a_sign_in",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": "run_signed_in returns without a window when the sign-in is abandoned."
+  },
+  {
+   "id": "test_access.TestTamperEvidentTrail.test_a_deleted_entry_is_caught",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.003,
+   "doc": ""
+  },
+  {
+   "id": "test_access.TestTamperEvidentTrail.test_an_edited_entry_is_caught_where_it_was_edited",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.003,
+   "doc": ""
+  },
+  {
+   "id": "test_access.TestTamperEvidentTrail.test_an_inserted_entry_is_caught",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.003,
+   "doc": ""
+  },
+  {
+   "id": "test_access.TestTamperEvidentTrail.test_an_untouched_trail_verifies",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.003,
+   "doc": ""
+  },
+  {
+   "id": "test_access.TestTamperEvidentTrail.test_entries_from_before_chaining_are_accepted_as_history",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.003,
+   "doc": ""
+  },
+  {
+   "id": "test_access.TestTamperEvidentTrail.test_every_entry_names_the_signed_in_account",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.003,
+   "doc": ""
+  },
+  {
+   "id": "test_access.TestTamperEvidentTrail.test_two_holders_of_the_file_keep_one_chain",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.005,
+   "doc": "The sign-in page and the window each hold a log on the same file."
+  },
+  {
+   "id": "test_app2.TestAuditTrail.test_a_corrupt_line_costs_only_that_line",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.002,
+   "doc": ""
+  },
+  {
+   "id": "test_app2.TestAuditTrail.test_an_entry_names_who_did_it",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.001,
+   "doc": ""
+  },
+  {
+   "id": "test_app2.TestAuditTrail.test_an_unwritable_location_is_reported_not_raised",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.001,
+   "doc": ""
+  },
+  {
+   "id": "test_app2.TestAuditTrail.test_both_kinds_are_recorded_and_told_apart",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.001,
+   "doc": ""
+  },
+  {
+   "id": "test_app2.TestAuditTrail.test_export_can_be_narrowed_to_one_kind",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.002,
+   "doc": ""
+  },
+  {
+   "id": "test_app2.TestAuditTrail.test_export_writes_oldest_first_for_a_reader",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.002,
+   "doc": ""
+  },
+  {
+   "id": "test_app2.TestAuditTrail.test_it_is_append_only_not_rewritten",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.003,
+   "doc": ""
+  },
+  {
+   "id": "test_app2.TestAuditTrail.test_the_newest_entry_is_the_first_one_read_back",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.001,
+   "doc": ""
+  },
+  {
+   "id": "test_app2.TestAuditTrail.test_the_trail_survives_a_restart",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.001,
+   "doc": ""
+  },
+  {
+   "id": "test_app2.TestConfirmedFindingsAlwaysReachAPerson.test_a_high_band_confirmed_finding_is_queued",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": ""
+  },
+  {
+   "id": "test_app2.TestConfirmedFindingsAlwaysReachAPerson.test_a_medium_band_confirmed_finding_is_queued",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": ""
+  },
+  {
+   "id": "test_app2.TestConfirmedFindingsAlwaysReachAPerson.test_critical_band_still_wins_on_specificity",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": "The catch-all never shadows a more specific, higher-priority trigger."
+  },
+  {
+   "id": "test_app2.TestConfirmedFindingsAlwaysReachAPerson.test_no_sif_potential_result_is_ever_left_unqueued",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": "Property check across every risk band, with and without extras active."
+  },
+  {
+   "id": "test_app2.TestEnergyWithoutBarrierTrigger.test_a_flagged_report_is_not_queued_twice_for_it",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": ""
+  },
+  {
+   "id": "test_app2.TestEnergyWithoutBarrierTrigger.test_an_ordinary_report_still_reaches_nobody",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": ""
+  },
+  {
+   "id": "test_app2.TestEnergyWithoutBarrierTrigger.test_high_energy_with_no_barrier_reaches_a_person",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": ""
+  },
+  {
+   "id": "test_app2.TestMinimizingLanguage.test_dismissive_wording_alone_does_not_manufacture_a_finding",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.014,
+   "doc": "The flag is informational - it never substitutes for energy x barrier."
+  },
+  {
+   "id": "test_app2.TestMinimizingLanguage.test_dismissive_wording_does_not_suppress_a_real_finding",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.015,
+   "doc": ""
+  },
+  {
+   "id": "test_app2.TestMinimizingLanguage.test_the_note_is_silent_when_there_is_nothing_to_flag",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": ""
+  },
+  {
+   "id": "test_app2.TestMinimizingLanguage.test_the_review_reason_names_the_mismatch",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": ""
+  },
+  {
+   "id": "test_app2.TestOCRLanguages.test_capability_check_does_not_import_the_paddle_runtime",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.003,
+   "doc": "The status line runs while the window opens; importing paddle costs"
+  },
+  {
+   "id": "test_app2.TestOCRLanguages.test_codes_match_what_paddleocr_accepts",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": ""
+  },
+  {
+   "id": "test_app2.TestOCRLanguages.test_extractor_reports_the_language_it_will_use",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": ""
+  },
+  {
+   "id": "test_app2.TestOCRLanguages.test_resolve_accepts_names_codes_and_aliases",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": ""
+  },
+  {
+   "id": "test_app2.TestOCRLanguages.test_the_indian_languages_asked_for_are_present",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": ""
+  },
+  {
+   "id": "test_app2.TestOCRLanguages.test_unknown_language_falls_back_to_english",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": ""
+  },
+  {
+   "id": "test_app2.TestOCRLanguages.test_unsupported_indian_languages_are_declared",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": ""
+  },
+  {
+   "id": "test_app2.TestOCRModelCache.test_a_failure_is_retried_when_the_operator_asks_again",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": ""
+  },
+  {
+   "id": "test_app2.TestOCRModelCache.test_a_half_finished_download_does_not_count_as_present",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": ""
+  },
+  {
+   "id": "test_app2.TestOCRModelCache.test_a_machine_that_has_the_models_is_told_so_every_start_up",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.001,
+   "doc": ""
+  },
+  {
+   "id": "test_app2.TestOCRModelCache.test_an_empty_machine_reports_nothing_cached",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.001,
+   "doc": ""
+  },
+  {
+   "id": "test_app2.TestOCRModelCache.test_detection_alone_is_not_enough_to_read_a_page",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.001,
+   "doc": ""
+  },
+  {
+   "id": "test_app2.TestOCRModelCache.test_prefetch_reports_every_language_and_never_raises",
+   "status": "pass",
+   "detail": "",
+   "seconds": 7.879,
+   "doc": ""
+  },
+  {
+   "id": "test_app2.TestOCRModelCache.test_switching_language_does_not_throw_the_engine_away",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": "Rebuilding the extractor is how language switching works - it must be free."
+  },
+  {
+   "id": "test_app2.TestOCRModelCache.test_the_cache_directory_follows_paddle_s_own_variable",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": ""
+  },
+  {
+   "id": "test_app2.TestOCRModelCache.test_the_listing_command_runs_without_touching_the_network",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.001,
+   "doc": ""
+  },
+  {
+   "id": "test_app2.TestOCRModelCache.test_verification_is_remembered_per_language",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": ""
+  },
+  {
+   "id": "test_app2.TestOllamaEngine.test_a_specific_tag_is_not_the_same_model_as_another",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.004,
+   "doc": "`gemma2` and `gemma2:9b` are two entries on the server, not one."
+  },
+  {
+   "id": "test_app2.TestOllamaEngine.test_an_untagged_name_matches_the_latest_tag",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.004,
+   "doc": "`ollama pull llama3.2` is stored as `llama3.2:latest`."
+  },
+  {
+   "id": "test_app2.TestOllamaEngine.test_analysis_returns_a_structured_opinion",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.001,
+   "doc": ""
+  },
+  {
+   "id": "test_app2.TestOllamaEngine.test_availability_and_models",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.003,
+   "doc": ""
+  },
+  {
+   "id": "test_app2.TestOllamaEngine.test_missing_model_is_reported_with_the_pull_command",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.002,
+   "doc": ""
+  },
+  {
+   "id": "test_app2.TestOllamaEngine.test_ready_is_false_when_the_host_is_unreachable",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": ""
+  },
+  {
+   "id": "test_app2.TestOllamaEngine.test_ready_is_false_when_the_model_is_missing",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.003,
+   "doc": "A server that answers is not the same as a server that can work."
+  },
+  {
+   "id": "test_app2.TestOllamaEngine.test_replies_wrapped_in_prose_are_still_parsed",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": ""
+  },
+  {
+   "id": "test_app2.TestOllamaEngine.test_script_detection_decides_when_to_translate",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": ""
+  },
+  {
+   "id": "test_app2.TestOllamaEngine.test_translation_returns_english",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.001,
+   "doc": ""
+  },
+  {
+   "id": "test_app2.TestOllamaEngine.test_unparsable_reply_is_an_error_not_a_crash",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": ""
+  },
+  {
+   "id": "test_app2.TestOllamaEngine.test_unreachable_host_degrades_quietly",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.001,
+   "doc": ""
+  },
+  {
+   "id": "test_app2.TestPipelineWithLLM.test_analyze_many_accepts_translations",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.041,
+   "doc": ""
+  },
+  {
+   "id": "test_app2.TestPipelineWithLLM.test_llm_disagreement_reaches_the_review_queue",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.014,
+   "doc": ""
+  },
+  {
+   "id": "test_app2.TestPipelineWithLLM.test_review_priority_places_disagreements_first",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": ""
+  },
+  {
+   "id": "test_app2.TestPipelineWithLLM.test_translated_report_keeps_the_original_as_evidence",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.014,
+   "doc": ""
+  },
+  {
+   "id": "test_app2.TestPipelineWithLLM.test_unreachable_llm_leaves_the_result_untouched",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.013,
+   "doc": ""
+  },
+  {
+   "id": "test_app2.TestPipelineWithLLM.test_verdict_is_unchanged_when_the_llm_is_attached",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.027,
+   "doc": ""
+  },
+  {
+   "id": "test_app2.TestReviewBench.test_a_decision_leaves_the_queue_and_becomes_a_label",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.121,
+   "doc": ""
+  },
+  {
+   "id": "test_app2.TestReviewBench.test_a_report_with_no_fatal_potential_does_not_claim_one",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.117,
+   "doc": ""
+  },
+  {
+   "id": "test_app2.TestReviewBench.test_a_report_with_no_reference_is_given_one",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.129,
+   "doc": "An unreferenced row reaches the decision log as a hash nobody can look up."
+  },
+  {
+   "id": "test_app2.TestReviewBench.test_clearing_the_corpus_forgets_the_reports_not_the_decisions",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.12,
+   "doc": ""
+  },
+  {
+   "id": "test_app2.TestReviewBench.test_decided_reports_come_back_when_asked_for",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.134,
+   "doc": ""
+  },
+  {
+   "id": "test_app2.TestReviewBench.test_deciding_never_skips_the_next_report",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.162,
+   "doc": "The queue rebuild moves the next report up; advancing again would skip it."
+  },
+  {
+   "id": "test_app2.TestReviewBench.test_every_case_opens_with_a_plain_english_brief",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.146,
+   "doc": "A reviewer must never have to assemble the verdict themselves."
+  },
+  {
+   "id": "test_app2.TestReviewBench.test_selecting_a_row_shows_the_whole_case",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.176,
+   "doc": ""
+  },
+  {
+   "id": "test_app2.TestReviewBench.test_the_audit_trail_records_what_the_operator_did",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.226,
+   "doc": ""
+  },
+  {
+   "id": "test_app2.TestReviewBench.test_the_brief_omits_fields_the_report_never_stated",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.221,
+   "doc": "\"Location not stated\" is honest in a column and noise in a sentence."
+  },
+  {
+   "id": "test_app2.TestReviewBench.test_the_header_counts_outstanding_work_not_decided_work",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.225,
+   "doc": ""
+  },
+  {
+   "id": "test_app2.TestReviewBench.test_the_queue_shows_what_is_outstanding",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.217,
+   "doc": ""
+  },
+  {
+   "id": "test_app2.TestReviewBench.test_the_same_report_analysed_twice_is_one_report",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.222,
+   "doc": "Loading a corpus again must not double-count the incidents in it."
+  },
+  {
+   "id": "test_app2.TestReviewBench.test_the_trail_keeps_every_entry_including_the_changed_ones",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.24,
+   "doc": ""
+  },
+  {
+   "id": "test_app2.TestReviewBench.test_too_small_a_corpus_is_refused_rather_than_trained",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.224,
+   "doc": ""
+  },
+  {
+   "id": "test_app2.TestReviewBench.test_training_prefers_human_labels_once_there_are_enough",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.226,
+   "doc": "Below the threshold it trains on pipeline verdicts, and says which."
+  },
+  {
+   "id": "test_app2.TestReviewBench.test_undo_puts_the_report_back_in_the_queue",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.224,
+   "doc": ""
+  },
+  {
+   "id": "test_app2.TestReviewDecisions.test_a_corrupt_file_reads_as_empty",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.001,
+   "doc": ""
+  },
+  {
+   "id": "test_app2.TestReviewDecisions.test_a_decision_reaches_disk_immediately",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.001,
+   "doc": ""
+  },
+  {
+   "id": "test_app2.TestReviewDecisions.test_a_read_only_location_is_reported_not_raised",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.001,
+   "doc": "An expert must never believe a decision was saved when it was not."
+  },
+  {
+   "id": "test_app2.TestReviewDecisions.test_an_unknown_decision_is_refused",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": ""
+  },
+  {
+   "id": "test_app2.TestReviewDecisions.test_an_unreviewed_report_is_never_guessed_at",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": ""
+  },
+  {
+   "id": "test_app2.TestReviewDecisions.test_changing_a_decision_supersedes_without_erasing",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.001,
+   "doc": ""
+  },
+  {
+   "id": "test_app2.TestReviewDecisions.test_decided_reports_leave_the_queue",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": ""
+  },
+  {
+   "id": "test_app2.TestReviewDecisions.test_export_carries_the_whole_trail",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.001,
+   "doc": ""
+  },
+  {
+   "id": "test_app2.TestReviewDecisions.test_fingerprint_survives_reformatting_but_separates_reports",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": "A decision must follow the report, not its row number or its whitespace."
+  },
+  {
+   "id": "test_app2.TestReviewDecisions.test_overturning_the_engine_is_recorded_as_such",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.001,
+   "doc": ""
+  },
+  {
+   "id": "test_app2.TestReviewDecisions.test_unclear_is_recorded_but_never_becomes_a_label",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.001,
+   "doc": ""
+  },
+  {
+   "id": "test_app2.TestReviewDecisions.test_undo_withdraws_only_the_last_entry",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.001,
+   "doc": ""
+  },
+  {
+   "id": "test_app2.TestSampleReports.test_every_sample_named_in_the_readme_exists",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": ""
+  },
+  {
+   "id": "test_app2.TestSampleReports.test_the_csv_imports_with_its_references",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.002,
+   "doc": ""
+  },
+  {
+   "id": "test_app2.TestSampleReports.test_the_multilingual_sample_covers_the_languages_claimed",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": ""
+  },
+  {
+   "id": "test_app2.TestSampleReports.test_the_sample_corpus_exercises_every_offline_trigger",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.062,
+   "doc": ""
+  },
+  {
+   "id": "test_app2.TestSampleReports.test_the_scan_has_no_text_layer_so_ocr_has_to_run",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": ""
+  },
+  {
+   "id": "test_app2.TestWorkflowAndInterface.test_an_english_report_needs_no_language_ceremony",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.011,
+   "doc": ""
+  },
+  {
+   "id": "test_app2.TestWorkflowAndInterface.test_an_untranslated_report_says_so_before_a_decision",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.013,
+   "doc": ""
+  },
+  {
+   "id": "test_app2.TestWorkflowAndInterface.test_clearing_the_bench_clears_the_language_bar",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.013,
+   "doc": ""
+  },
+  {
+   "id": "test_app2.TestWorkflowAndInterface.test_dashboard_is_its_own_page",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.022,
+   "doc": ""
+  },
+  {
+   "id": "test_app2.TestWorkflowAndInterface.test_each_entry_point_wears_its_own_skin_the_same_way",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.001,
+   "doc": "Two designs, one mechanism."
+  },
+  {
+   "id": "test_app2.TestWorkflowAndInterface.test_every_page_can_scroll_rather_than_squeeze",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.587,
+   "doc": "A 1366x768 plant laptop must reach every control on every page."
+  },
+  {
+   "id": "test_app2.TestWorkflowAndInterface.test_every_skin_covers_the_same_colours",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.001,
+   "doc": "No palette may leave a colour on another design's value."
+  },
+  {
+   "id": "test_app2.TestWorkflowAndInterface.test_map_covers_every_capability_in_order",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.01,
+   "doc": ""
+  },
+  {
+   "id": "test_app2.TestWorkflowAndInterface.test_map_statuses_are_settable",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.009,
+   "doc": ""
+  },
+  {
+   "id": "test_app2.TestWorkflowAndInterface.test_stage_button_emits_its_key",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.009,
+   "doc": ""
+  },
+  {
+   "id": "test_app2.TestWorkflowAndInterface.test_the_bench_reviews_in_english_and_keeps_the_original",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.007,
+   "doc": "A reviewer cannot judge fatal potential in a script they do not read."
+  },
+  {
+   "id": "test_app2.TestWorkflowAndInterface.test_the_decision_buttons_are_never_scrolled_out_of_reach",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.007,
+   "doc": "The case detail scrolls; the three decisions stay where the eye expects."
+  },
+  {
+   "id": "test_app2.TestWorkflowAndInterface.test_the_interface_carries_no_pictographs",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.002,
+   "doc": "Build 2 must render on a workstation with no emoji font."
+  },
+  {
+   "id": "test_app2.TestWorkflowAndInterface.test_the_scroll_helper_sets_the_policies_the_theme_expects",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": ""
+  },
+  {
+   "id": "test_functional.TestBlackAndLimeBuild.test_a_long_field_value_cannot_widen_the_detail_panel",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.451,
+   "doc": "A long barrier list must elide, not push the panel past its pane."
+  },
+  {
+   "id": "test_functional.TestBlackAndLimeBuild.test_column_headings_are_capitals_in_this_build_only",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.574,
+   "doc": "Qt cannot uppercase in a style sheet, so the skin says so in code."
+  },
+  {
+   "id": "test_functional.TestBlackAndLimeBuild.test_each_entry_point_builds_its_own_design",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.73,
+   "doc": "Two designs, and both dressed the same way."
+  },
+  {
+   "id": "test_functional.TestBlackAndLimeBuild.test_it_carries_every_capability_of_the_untouched_build",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.288,
+   "doc": ""
+  },
+  {
+   "id": "test_functional.TestBlackAndLimeBuild.test_nothing_inside_the_rail_paints_the_page_over_it",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.406,
+   "doc": "The failure this design invites, held by a test."
+  },
+  {
+   "id": "test_functional.TestBlackAndLimeBuild.test_the_page_heading_sits_on_a_band_of_its_own",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.437,
+   "doc": "One step lighter than the page, with a hairline under it."
+  },
+  {
+   "id": "test_functional.TestBlackAndLimeBuild.test_the_rail_is_black_and_the_page_is_the_charcoal",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.369,
+   "doc": "The design in one assertion, measured off the rendered window."
+  },
+  {
+   "id": "test_functional.TestBlackAndLimeBuild.test_the_rail_is_words_in_capitals_and_nothing_else",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.591,
+   "doc": "The reference's rail is a list of words - no icons, no numbering."
+  },
+  {
+   "id": "test_functional.TestBlackAndLimeBuild.test_the_skin_actually_changes_the_palette",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.302,
+   "doc": ""
+  },
+  {
+   "id": "test_functional.TestBlackAndLimeBuild.test_the_two_builds_are_told_apart_in_the_title_bar",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.298,
+   "doc": ""
+  },
+  {
+   "id": "test_functional.TestBlackAndLimeBuild.test_the_white_and_grey_skin_is_still_its_design_token_for_token",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": "The other light skin, kept and still pinned to its reference."
+  },
+  {
+   "id": "test_functional.TestBuildOneStillWorks.test_the_original_window_analyses_the_seed_corpus",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.362,
+   "doc": ""
+  },
+  {
+   "id": "test_functional.TestBuildOneStillWorks.test_the_two_builds_coexist_in_one_process",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": ""
+  },
+  {
+   "id": "test_functional.TestBuildTwoWindowEndToEnd.test_a_closed_window_does_not_start_an_update_check",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.156,
+   "doc": "The start-up check fires on a timer; the window may be gone by then."
+  },
+  {
+   "id": "test_functional.TestBuildTwoWindowEndToEnd.test_a_corpus_imported_twice_stays_one_corpus",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.379,
+   "doc": "The whole CSV, twice - the second pass must replace, not duplicate."
+  },
+  {
+   "id": "test_functional.TestBuildTwoWindowEndToEnd.test_a_search_that_matches_nothing_says_so_rather_than_looking_broken",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.234,
+   "doc": ""
+  },
+  {
+   "id": "test_functional.TestBuildTwoWindowEndToEnd.test_documents_are_read_and_queued_for_analysis",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.235,
+   "doc": "Drives Add documents itself, with the file chooser answered for it."
+  },
+  {
+   "id": "test_functional.TestBuildTwoWindowEndToEnd.test_every_language_sample_is_read_and_analysed",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.279,
+   "doc": "Tamil, Hindi and the rest reach a verdict rather than being dropped."
+  },
+  {
+   "id": "test_functional.TestBuildTwoWindowEndToEnd.test_exporting_the_corpus_writes_every_row",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.297,
+   "doc": ""
+  },
+  {
+   "id": "test_functional.TestBuildTwoWindowEndToEnd.test_generating_a_bulletin_writes_a_traceable_document",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.31,
+   "doc": "The auto-written bulletin over the real corpus, exercised end to end."
+  },
+  {
+   "id": "test_functional.TestBuildTwoWindowEndToEnd.test_importing_a_csv_goes_through_the_real_import_path",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.297,
+   "doc": ""
+  },
+  {
+   "id": "test_functional.TestBuildTwoWindowEndToEnd.test_reviewing_a_report_moves_it_out_of_the_queue_and_into_the_trail",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.291,
+   "doc": ""
+  },
+  {
+   "id": "test_functional.TestBuildTwoWindowEndToEnd.test_the_audit_trail_carries_the_session_end_to_end",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.293,
+   "doc": ""
+  },
+  {
+   "id": "test_functional.TestBuildTwoWindowEndToEnd.test_the_log_view_shows_what_the_session_did",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.627,
+   "doc": ""
+  },
+  {
+   "id": "test_functional.TestBuildTwoWindowEndToEnd.test_the_search_box_filters_reports_and_hotspots_alike",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.265,
+   "doc": ""
+  },
+  {
+   "id": "test_functional.TestBuildTwoWindowEndToEnd.test_the_whole_console_fills_in_from_one_import",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.505,
+   "doc": ""
+  },
+  {
+   "id": "test_functional.TestBuildTwoWindowEndToEnd.test_the_workflow_map_reports_what_has_actually_happened",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.28,
+   "doc": ""
+  },
+  {
+   "id": "test_functional.TestDecisionTrailScaleAndClearing.test_an_unchanged_trail_is_not_rebuilt",
+   "status": "pass",
+   "detail": "",
+   "seconds": 2.328,
+   "doc": ""
+  },
+  {
+   "id": "test_functional.TestDecisionTrailScaleAndClearing.test_clearing_an_empty_queue_says_so_rather_than_asking",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.254,
+   "doc": ""
+  },
+  {
+   "id": "test_functional.TestDecisionTrailScaleAndClearing.test_clearing_an_empty_trail_says_so_rather_than_asking",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.222,
+   "doc": ""
+  },
+  {
+   "id": "test_functional.TestDecisionTrailScaleAndClearing.test_clearing_the_trail_asks_first_and_says_what_it_costs",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.232,
+   "doc": ""
+  },
+  {
+   "id": "test_functional.TestDecisionTrailScaleAndClearing.test_confirming_clears_the_trail_and_records_that_it_happened",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.291,
+   "doc": ""
+  },
+  {
+   "id": "test_functional.TestDecisionTrailScaleAndClearing.test_confirming_empties_the_queue_but_keeps_the_decisions",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.39,
+   "doc": ""
+  },
+  {
+   "id": "test_functional.TestDecisionTrailScaleAndClearing.test_refreshing_stays_cheap_as_the_trail_grows",
+   "status": "pass",
+   "detail": "",
+   "seconds": 21.035,
+   "doc": ""
+  },
+  {
+   "id": "test_functional.TestDecisionTrailScaleAndClearing.test_the_clear_button_is_on_the_trail_tab_of_both_builds",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.618,
+   "doc": ""
+  },
+  {
+   "id": "test_functional.TestDecisionTrailScaleAndClearing.test_the_clear_button_is_wired_to_the_confirmation",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.256,
+   "doc": "The button must go through the dialog, not straight to the clear."
+  },
+  {
+   "id": "test_functional.TestDecisionTrailScaleAndClearing.test_the_queue_has_a_clear_of_its_own_that_asks_first",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.223,
+   "doc": ""
+  },
+  {
+   "id": "test_functional.TestExtractedDocumentActions.test_analysing_one_document_analyses_only_its_blocks",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.201,
+   "doc": ""
+  },
+  {
+   "id": "test_functional.TestExtractedDocumentActions.test_preview_shows_the_document_whose_button_was_pressed",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.2,
+   "doc": ""
+  },
+  {
+   "id": "test_functional.TestExtractedDocumentActions.test_remove_drops_only_that_document_and_its_blocks",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.196,
+   "doc": ""
+  },
+  {
+   "id": "test_functional.TestExtractedDocumentActions.test_the_controls_sit_on_the_row_and_are_not_hidden_off_the_edge",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.177,
+   "doc": ""
+  },
+  {
+   "id": "test_functional.TestHotspotsPage.test_a_populated_page_says_what_it_adds_up_to",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.254,
+   "doc": ""
+  },
+  {
+   "id": "test_functional.TestHotspotsPage.test_an_elided_cell_keeps_its_full_value_in_a_tooltip",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.25,
+   "doc": ""
+  },
+  {
+   "id": "test_functional.TestHotspotsPage.test_an_empty_page_explains_itself_and_does_not_repeat_its_title",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.11,
+   "doc": ""
+  },
+  {
+   "id": "test_functional.TestHotspotsPage.test_the_table_comes_back_once_there_are_hotspots",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.251,
+   "doc": ""
+  },
+  {
+   "id": "test_functional.TestHotspotsPage.test_the_ten_columns_fit_the_page_instead_of_scrolling_sideways",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.227,
+   "doc": "No horizontal scrollbar, so the last column is not half a column."
+  },
+  {
+   "id": "test_functional.TestImportSpeed.test_the_console_adds_little_to_the_cost_of_analysis",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.584,
+   "doc": ""
+  },
+  {
+   "id": "test_functional.TestIngestionPathsEndToEnd.test_a_non_english_report_is_carried_through_not_dropped",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.037,
+   "doc": "Without a translator the text still analyses; it is never discarded."
+  },
+  {
+   "id": "test_functional.TestIngestionPathsEndToEnd.test_a_pdf_is_read_through_its_text_layer_without_ocr",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.011,
+   "doc": ""
+  },
+  {
+   "id": "test_functional.TestIngestionPathsEndToEnd.test_a_text_document_splits_into_report_sized_blocks",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.017,
+   "doc": ""
+  },
+  {
+   "id": "test_functional.TestIngestionPathsEndToEnd.test_corpus_aggregation_produces_the_dashboard_numbers",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.052,
+   "doc": ""
+  },
+  {
+   "id": "test_functional.TestIngestionPathsEndToEnd.test_the_csv_becomes_analysed_reports",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.05,
+   "doc": ""
+  },
+  {
+   "id": "test_functional.TestReviewToLabelsEndToEnd.test_the_model_trains_on_the_decisions_a_person_made",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.251,
+   "doc": ""
+  },
+  {
+   "id": "test_functional.TestReviewToLabelsEndToEnd.test_the_trail_exports_for_an_auditor",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.063,
+   "doc": ""
+  },
+  {
+   "id": "test_functional.TestReviewToLabelsEndToEnd.test_working_the_queue_empties_it_and_leaves_a_trail",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.084,
+   "doc": ""
+  },
+  {
+   "id": "test_functional.TestTranslationWithoutAManualProbe.test_a_fresh_session_translates_with_no_probe_first",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.17,
+   "doc": ""
+  },
+  {
+   "id": "test_functional.TestTranslationWithoutAManualProbe.test_an_english_corpus_never_asks_the_translator_anything",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.129,
+   "doc": "Readiness is resolved lazily, so an English corpus opens no socket."
+  },
+  {
+   "id": "test_functional.TestTranslationWithoutAManualProbe.test_an_unreachable_host_is_named_rather_than_left_silent",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.134,
+   "doc": ""
+  },
+  {
+   "id": "test_functional.TestTranslationWithoutAManualProbe.test_readiness_is_settled_once_per_run_not_once_per_report",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.132,
+   "doc": ""
+  },
+  {
+   "id": "test_functional.TestTranslationWithoutAManualProbe.test_switching_translation_off_is_still_honoured",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.142,
+   "doc": ""
+  },
+  {
+   "id": "test_release.TestReleaseWorkflow.test_pyinstaller_spec_is_present",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": ""
+  },
+  {
+   "id": "test_release.TestReleaseWorkflow.test_the_installer_falls_back_to_the_packages_own_version",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": "Compiling from the Inno Setup window passes no /DAppVersion."
+  },
+  {
+   "id": "test_release.TestReleaseWorkflow.test_the_spec_builds_the_shipped_interface",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": "app.py is what an operator has been shown; app2.py is the other skin."
+  },
+  {
+   "id": "test_release.TestReleaseWorkflow.test_workflow_exists_and_triggers_on_version_tags",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": ""
+  },
+  {
+   "id": "test_release.TestReleaseWorkflow.test_workflow_publishes_what_the_updater_looks_for",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": ""
+  },
+  {
+   "id": "test_release.TestReleaseWorkflow.test_workflow_stamps_the_version_from_the_tag",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": ""
+  },
+  {
+   "id": "test_release.TestUpdateChecker.test_a_packaged_build_is_offered_the_installer",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.028,
+   "doc": ""
+  },
+  {
+   "id": "test_release.TestUpdateChecker.test_download_verifies_the_checksum",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.088,
+   "doc": ""
+  },
+  {
+   "id": "test_release.TestUpdateChecker.test_finds_a_newer_release",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.028,
+   "doc": ""
+  },
+  {
+   "id": "test_release.TestUpdateChecker.test_no_asset_for_this_platform_is_reported_not_raised",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": ""
+  },
+  {
+   "id": "test_release.TestUpdateChecker.test_picks_the_asset_for_this_platform",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.03,
+   "doc": ""
+  },
+  {
+   "id": "test_release.TestUpdateChecker.test_prereleases_are_ignored_unless_asked_for",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.088,
+   "doc": "A repository holding only a pre-release has no stable release yet."
+  },
+  {
+   "id": "test_release.TestUpdateChecker.test_release_without_checksums_is_refused",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.057,
+   "doc": ""
+  },
+  {
+   "id": "test_release.TestUpdateChecker.test_repository_without_a_release_is_not_a_failure",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.071,
+   "doc": "Before the first tag, /releases/latest answers 404. That is normal."
+  },
+  {
+   "id": "test_release.TestUpdateChecker.test_same_or_older_release_is_not_an_update",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.067,
+   "doc": ""
+  },
+  {
+   "id": "test_release.TestUpdateChecker.test_source_checkout_is_told_to_pull_not_to_install",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.031,
+   "doc": ""
+  },
+  {
+   "id": "test_release.TestUpdateChecker.test_tampered_download_is_refused_and_deleted",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.089,
+   "doc": ""
+  },
+  {
+   "id": "test_release.TestUpdateChecker.test_unreachable_api_degrades_quietly",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.027,
+   "doc": ""
+  },
+  {
+   "id": "test_release.TestUpdateChecker.test_unreachable_repository_says_which_repository",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.056,
+   "doc": ""
+  },
+  {
+   "id": "test_release.TestVersioning.test_garbage_never_triggers_an_update",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": ""
+  },
+  {
+   "id": "test_release.TestVersioning.test_ordering",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": ""
+  },
+  {
+   "id": "test_release.TestVersioning.test_parse_and_normalise",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": ""
+  },
+  {
+   "id": "test_release.TestVersioning.test_prereleases_sort_below_their_release",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": ""
+  },
+  {
+   "id": "test_release.TestVersioning.test_the_package_reports_one_version",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": ""
+  },
+  {
+   "id": "test_release.TestVersioning.test_version_line_is_machine_editable",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": "CI rewrites this line from the tag - keep it matchable."
+  },
+  {
+   "id": "test_sif.TestAnalysisWorker.test_falls_back_to_longest_cell_without_known_column",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.001,
+   "doc": ""
+  },
+  {
+   "id": "test_sif.TestAnalysisWorker.test_missing_file_raises",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": ""
+  },
+  {
+   "id": "test_sif.TestAnalysisWorker.test_pipeline_runs_off_the_main_thread",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.045,
+   "doc": ""
+  },
+  {
+   "id": "test_sif.TestAnalysisWorker.test_reads_named_description_column_with_reference",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.018,
+   "doc": ""
+  },
+  {
+   "id": "test_sif.TestBuildOneInterface.test_the_empty_detail_panel_says_it_is_empty",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.011,
+   "doc": "An unexplained dark block reads as a rendering fault, not as 'no data'."
+  },
+  {
+   "id": "test_sif.TestBuildOneInterface.test_the_interface_carries_no_pictographs",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.001,
+   "doc": "It must render identically on a workstation with no emoji font."
+  },
+  {
+   "id": "test_sif.TestBuildOneInterface.test_the_window_remembers_where_it_was",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.135,
+   "doc": "Saved geometry is clamped to this screen, and nonsense is ignored."
+  },
+  {
+   "id": "test_sif.TestBuildOneInterface.test_the_workspace_columns_can_be_resized",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.01,
+   "doc": "A fixed three-column split is a mock-up; a draggable one is an app."
+  },
+  {
+   "id": "test_sif.TestDocumentExtraction.test_batch_records_failures_instead_of_raising",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": ""
+  },
+  {
+   "id": "test_sif.TestDocumentExtraction.test_probe_returns_a_verdict_either_way",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.004,
+   "doc": ""
+  },
+  {
+   "id": "test_sif.TestDocumentExtraction.test_reads_pdf_text_layer_without_ocr",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.011,
+   "doc": ""
+  },
+  {
+   "id": "test_sif.TestDocumentExtraction.test_reads_plain_text",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": ""
+  },
+  {
+   "id": "test_sif.TestDocumentExtraction.test_status_is_honest_before_loading",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": ""
+  },
+  {
+   "id": "test_sif.TestDocumentExtraction.test_unsupported_type_and_missing_file",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": ""
+  },
+  {
+   "id": "test_sif.TestEncoders.test_auto_backend_always_returns_a_working_encoder",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": ""
+  },
+  {
+   "id": "test_sif.TestEncoders.test_explicit_hashing_backend_never_downloads",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": ""
+  },
+  {
+   "id": "test_sif.TestEncoders.test_fallback_encoder_is_marked_non_semantic",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": ""
+  },
+  {
+   "id": "test_sif.TestEncoders.test_similarity_is_bounded_and_non_negative",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": ""
+  },
+  {
+   "id": "test_sif.TestEncoders.test_transformer_encoder_defers_loading",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": ""
+  },
+  {
+   "id": "test_sif.TestEncoders.test_unavailable_transformer_raises_when_demanded",
+   "status": "pass",
+   "detail": "",
+   "seconds": 3.462,
+   "doc": ""
+  },
+  {
+   "id": "test_sif.TestEncoders.test_vectors_are_unit_length_and_deterministic",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.001,
+   "doc": ""
+  },
+  {
+   "id": "test_sif.TestEngineQuality.test_every_confirmed_finding_reaches_a_person",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": "Independent of the label: a raised flag is never left unseen."
+  },
+  {
+   "id": "test_sif.TestEngineQuality.test_no_precursor_is_both_missed_and_unqueued",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": "The one failure with no safety net: wrong, and nobody asked to look."
+  },
+  {
+   "id": "test_sif.TestEngineQuality.test_precision_stays_above_the_floor",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": ""
+  },
+  {
+   "id": "test_sif.TestEngineQuality.test_recall_stays_above_the_floor",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": ""
+  },
+  {
+   "id": "test_sif.TestEngineQuality.test_the_labelled_set_is_balanced_enough_to_mean_something",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.001,
+   "doc": ""
+  },
+  {
+   "id": "test_sif.TestEngineQuality.test_the_negative_controls_do_not_flag",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.037,
+   "doc": "Reports describing controls that held must never read as precursors."
+  },
+  {
+   "id": "test_sif.TestHeads.test_calibration_is_bounded_and_capped_for_the_fallback",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": ""
+  },
+  {
+   "id": "test_sif.TestHeads.test_margin_detects_a_flat_ranking",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": ""
+  },
+  {
+   "id": "test_sif.TestHeads.test_semantic_index_ranks_every_label",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.011,
+   "doc": ""
+  },
+  {
+   "id": "test_sif.TestIntelligence.test_activities_are_ranked_as_hotspots",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.015,
+   "doc": ""
+  },
+  {
+   "id": "test_sif.TestIntelligence.test_critical_reports_are_queued_for_review",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": ""
+  },
+  {
+   "id": "test_sif.TestIntelligence.test_hotspots_rank_by_evidence_adjusted_density",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": ""
+  },
+  {
+   "id": "test_sif.TestIntelligence.test_kpis",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": ""
+  },
+  {
+   "id": "test_sif.TestIntelligence.test_offline_mode_never_reports_disagreement",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": ""
+  },
+  {
+   "id": "test_sif.TestIntelligence.test_repeat_location_becomes_a_hotspot",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": ""
+  },
+  {
+   "id": "test_sif.TestIntelligence.test_singleton_groups_are_not_hotspots",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": ""
+  },
+  {
+   "id": "test_sif.TestIntelligence.test_thin_evidence_is_flagged",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.001,
+   "doc": ""
+  },
+  {
+   "id": "test_sif.TestInterfaceWidgets.test_charts_accept_data_and_empty_state",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.003,
+   "doc": ""
+  },
+  {
+   "id": "test_sif.TestInterfaceWidgets.test_dashboard_renders_a_result",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.031,
+   "doc": ""
+  },
+  {
+   "id": "test_sif.TestInterfaceWidgets.test_data_table_formats_cells",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.001,
+   "doc": ""
+  },
+  {
+   "id": "test_sif.TestInterfaceWidgets.test_pages_scroll_instead_of_squashing",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.014,
+   "doc": ""
+  },
+  {
+   "id": "test_sif.TestInterfaceWidgets.test_settings_view_renders_state",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.004,
+   "doc": ""
+  },
+  {
+   "id": "test_sif.TestLexicalEngine.test_blank_input_returns_fallbacks",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": ""
+  },
+  {
+   "id": "test_sif.TestLexicalEngine.test_electrical_isolation_failure_is_sif",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.001,
+   "doc": ""
+  },
+  {
+   "id": "test_sif.TestLexicalEngine.test_height_with_failed_fall_protection_is_sif",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.001,
+   "doc": ""
+  },
+  {
+   "id": "test_sif.TestLexicalEngine.test_high_energy_with_controls_in_place_is_not_sif",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.001,
+   "doc": ""
+  },
+  {
+   "id": "test_sif.TestLexicalEngine.test_low_energy_observation_is_not_sif",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.001,
+   "doc": ""
+  },
+  {
+   "id": "test_sif.TestLexicalEngine.test_returns_all_required_keys",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": ""
+  },
+  {
+   "id": "test_sif.TestLexicalEngine.test_rule_scores_are_exposed_for_fusion",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.001,
+   "doc": ""
+  },
+  {
+   "id": "test_sif.TestMLOps.test_feature_vector_matches_the_named_columns",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.001,
+   "doc": ""
+  },
+  {
+   "id": "test_sif.TestMLOps.test_features_are_empty_safe",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": ""
+  },
+  {
+   "id": "test_sif.TestMLOps.test_mlflow_run_is_logged_and_listed",
+   "status": "pass",
+   "detail": "",
+   "seconds": 1.02,
+   "doc": ""
+  },
+  {
+   "id": "test_sif.TestMLOps.test_small_corpus_relaxes_regularisation",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": ""
+  },
+  {
+   "id": "test_sif.TestMLOps.test_train_predict_save_load_roundtrip",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.924,
+   "doc": ""
+  },
+  {
+   "id": "test_sif.TestMLOps.test_training_requires_both_classes_and_enough_rows",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": ""
+  },
+  {
+   "id": "test_sif.TestMLOps.test_untrained_service_predicts_none",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": ""
+  },
+  {
+   "id": "test_sif.TestModelInPipeline.test_attached_model_scores_every_row",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.041,
+   "doc": ""
+  },
+  {
+   "id": "test_sif.TestModelInPipeline.test_model_disagreement_reaches_the_review_queue",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.014,
+   "doc": ""
+  },
+  {
+   "id": "test_sif.TestModelInPipeline.test_provider_returning_none_is_ignored",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.013,
+   "doc": ""
+  },
+  {
+   "id": "test_sif.TestNarrativeGeneration.test_a_clear_queue_says_so_explicitly",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": ""
+  },
+  {
+   "id": "test_sif.TestNarrativeGeneration.test_a_flagged_report_names_the_rule_and_the_risk",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": ""
+  },
+  {
+   "id": "test_sif.TestNarrativeGeneration.test_an_empty_report_is_named_not_hallucinated",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": ""
+  },
+  {
+   "id": "test_sif.TestNarrativeGeneration.test_an_unflagged_report_does_not_claim_fatal_potential",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": ""
+  },
+  {
+   "id": "test_sif.TestNarrativeGeneration.test_every_cited_reference_is_a_real_analysed_report",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": ""
+  },
+  {
+   "id": "test_sif.TestNarrativeGeneration.test_language_coverage_appears_only_for_translated_reports",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": ""
+  },
+  {
+   "id": "test_sif.TestNarrativeGeneration.test_minimizing_language_is_named_only_when_present",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": ""
+  },
+  {
+   "id": "test_sif.TestNarrativeGeneration.test_sections_are_silent_when_there_is_nothing_to_say",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": ""
+  },
+  {
+   "id": "test_sif.TestNarrativeGeneration.test_the_bulletin_headline_matches_the_kpis_it_was_built_from",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": ""
+  },
+  {
+   "id": "test_sif.TestNarrativeGeneration.test_translation_is_disclosed_when_the_report_was_translated",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": ""
+  },
+  {
+   "id": "test_sif.TestPipeline.test_analyze_many_skips_blanks",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.001,
+   "doc": ""
+  },
+  {
+   "id": "test_sif.TestPipeline.test_blank_report_is_handled",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": ""
+  },
+  {
+   "id": "test_sif.TestPipeline.test_every_result_reports_its_encoder",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": ""
+  },
+  {
+   "id": "test_sif.TestPipeline.test_evidence_carries_the_audit_trail",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": ""
+  },
+  {
+   "id": "test_sif.TestPipeline.test_non_sif_report_scores_zero_risk",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": ""
+  },
+  {
+   "id": "test_sif.TestPipeline.test_offline_backend_raises_no_semantic_flag",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": ""
+  },
+  {
+   "id": "test_sif.TestPipeline.test_required_fields_survive_the_rewrite",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": ""
+  },
+  {
+   "id": "test_sif.TestPipeline.test_risk_score_is_bounded_and_banded",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": ""
+  },
+  {
+   "id": "test_sif.TestPipeline.test_seed_corpus_matches_the_lexical_baseline",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": ""
+  },
+  {
+   "id": "test_sif.TestPreprocessor.test_blank_input_yields_empty_document",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": ""
+  },
+  {
+   "id": "test_sif.TestPreprocessor.test_expands_domain_abbreviations_for_the_encoder",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": ""
+  },
+  {
+   "id": "test_sif.TestPreprocessor.test_segments_sentences_without_splitting_on_no",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": ""
+  },
+  {
+   "id": "test_sif.TestPreprocessor.test_tokens_are_lowercased",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": ""
+  },
+  {
+   "id": "test_sif.TestScoring.test_band_thresholds",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": ""
+  },
+  {
+   "id": "test_sif.TestScoring.test_housekeeping_barrier_ranks_below_isolation",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": ""
+  },
+  {
+   "id": "test_sif.TestSystemLogging.test_listener_receives_records",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.001,
+   "doc": ""
+  },
+  {
+   "id": "test_sif.TestSystemLogging.test_ring_buffer_captures_and_filters",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.002,
+   "doc": ""
+  },
+  {
+   "id": "test_sif.TestTheme.test_every_referenced_asset_exists",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": ""
+  },
+  {
+   "id": "test_sif.TestTheme.test_scroll_controls_are_styled",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": ""
+  },
+  {
+   "id": "test_sif.TestTrainerCLI.test_dry_run_succeeds_and_bad_input_fails",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.035,
+   "doc": ""
+  },
+  {
+   "id": "test_sif.TestTrainerCLI.test_label_column_is_auto_detected",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.001,
+   "doc": ""
+  },
+  {
+   "id": "test_sif.TestTrainerCLI.test_missing_narrative_column_is_rejected",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.001,
+   "doc": ""
+  },
+  {
+   "id": "test_sif.TestTrainerCLI.test_reads_narratives_references_and_labels",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.001,
+   "doc": ""
+  },
+  {
+   "id": "test_sif.TestTrainerCLI.test_without_labels_none_is_returned",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": ""
+  },
+  {
+   "id": "test_sif.TestTrainingCorpus.test_every_labelled_precursor_is_found",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": ""
+  },
+  {
+   "id": "test_sif.TestTrainingCorpus.test_it_does_not_overlap_the_evaluation_set",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.001,
+   "doc": "Training on the set that measures you turns every score into a fiction."
+  },
+  {
+   "id": "test_sif.TestTrainingCorpus.test_it_is_usable_as_training_data",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": "Both verdicts present in quantity, or the model learns one answer."
+  },
+  {
+   "id": "test_sif.TestTrainingCorpus.test_no_negative_control_flags",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": ""
+  },
+  {
+   "id": "test_sif.TestTrainingCorpus.test_the_three_phrasings_this_set_exposed_stay_readable",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": "Reversed word order, a quantifier in the negation, and a gerund."
+  },
+  {
+   "id": "test_sif.TestWhereAnInstalledBuildWrites.test_a_checkout_writes_beside_the_code",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": ""
+  },
+  {
+   "id": "test_sif.TestWhereAnInstalledBuildWrites.test_a_frozen_build_writes_under_the_user_data_directory",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": ""
+  },
+  {
+   "id": "test_sif.TestWhereAnInstalledBuildWrites.test_an_explicit_path_still_wins",
+   "status": "pass",
+   "detail": "",
+   "seconds": 0.0,
+   "doc": ""
+  }
+ ]
+}
