@@ -27,7 +27,6 @@ from PyQt6.QtWidgets import (
     QSizePolicy,
     QToolButton,
     QVBoxLayout,
-    QWidget,
 )
 
 __all__ = ["WorkspaceHeader", "TabRow", "header_icon", "find_logo", "LOGO_NAMES"]
@@ -147,7 +146,8 @@ class WorkspaceHeader(QFrame):
         org = QVBoxLayout()
         org.setSpacing(0)
         org.addWidget(self.organisation)
-        org.addWidget(_label(place, "OrgPlace"))
+        self.place = _label(place, "OrgPlace")
+        org.addWidget(self.place)
         left = QHBoxLayout()
         left.setSpacing(10)
         left.addWidget(mark)
@@ -240,6 +240,12 @@ class WorkspaceHeader(QFrame):
         menu.addSeparator()
         menu.addAction("Sign out").triggered.connect(self.sign_out_requested.emit)
         return menu
+
+    def set_identity(self, organisation: str, place: str, project: str) -> None:
+        """Organisation, field HQ and project code, as Settings has them."""
+        self.organisation.setText(organisation)
+        self.place.setText(place)
+        self.project.setText(project)
 
     def set_bell(self, count: int) -> None:
         self.bell_badge.setText(str(count) if count < 100 else "99+")

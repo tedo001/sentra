@@ -13,7 +13,10 @@ What this module changes is who sees what, and the chrome around it:
   Audit Log, and manages accounts - and does *not* record review decisions, so
   platform control and safety judgement stay in separate accounts. This
   applies in build 4 only; the other builds keep their four roles.
-* **A title row and a tab row** in place of the sidebar, per the Stage 2 sheet.
+* **A title row and a tab row** in place of the sidebar, per the Stage 2 sheet,
+  and every page laid out as the SENTRA HSE application design draws it -
+  the pages live in :mod:`ui4` and are fed by the mixins in
+  :mod:`ui4.hse_wiring` and :mod:`ui4.admin_wiring`.
 
 The account store's four roles map onto the two: ``admin`` is an
 Administrator; ``analyst`` and ``reviewer`` are HSE Analysts; ``viewer`` opens
@@ -27,7 +30,7 @@ from dataclasses import dataclass, fields
 from datetime import date
 from typing import Dict, List, Optional, Tuple
 
-from PyQt6.QtWidgets import QMessageBox, QVBoxLayout, QWidget
+from PyQt6.QtWidgets import QMessageBox, QWidget
 
 from main2 import APP_NAME, MainWindow, requires
 from sif import prefs
@@ -35,9 +38,10 @@ from sif.actions import ActionStore
 from sif.accounts import (ANALYSE, CLEAR, CONFIGURE, DECIDE, MANAGE_USERS, TRAIN, VIEW,
                           AccountStore, AuthError, Session)
 from sif.version import __version__
-from ui2.activity import AccountDialog, ActivityView
+from ui2.activity import AccountDialog
 from ui2.components import titled
 from ui4.calendar import ActionDetailDialog, ActionDialog, ActionsView
+from ui4.admin_wiring import AdminPages
 from ui4.hse_wiring import HSEPages, IngestFlow
 from ui4.present import initials, stamp
 from ui4.kit import Page
@@ -66,7 +70,7 @@ ROLE_NAMES = {"admin": "Administrator", "reviewer": "HSE Analyst",
 #: What an administrator can create here: the two roles the sheets draw. An HSE
 #: Analyst is stored as ``reviewer`` so the same account can decide cases in the
 #: other builds too.
-CREATABLE = ("reviewer", "admin")
+CREATABLE = ("viewer", "reviewer", "admin")
 
 
 @dataclass(frozen=True)
@@ -96,7 +100,7 @@ def workspace_session(session: Optional[Session]) -> WorkspaceSession:
                                for item in fields(Session)})
 
 
-class WorkspaceWindow(IngestFlow, HSEPages, MainWindow):
+class WorkspaceWindow(AdminPages, IngestFlow, HSEPages, MainWindow):
     """Build 2's console behind build 4's two workspaces."""
 
     MIN_WIDTH, MIN_HEIGHT = 1366, 768
@@ -178,35 +182,24 @@ class WorkspaceWindow(IngestFlow, HSEPages, MainWindow):
         self._page_index["actions"] = self.pages.addWidget(actions_page)
         self.reports_page = self._build_reports()
         self._page_index["reports"] = self.pages.addWidget(self.reports_page)
+        self.engines_page = self._build_engines()
+        self._page_index["engines"] = self.pages.addWidget(self.engines_page)
+        self.settings_page = self._build_settings()
+        self._page_index["settings"] = self.pages.addWidget(self.settings_page)
 
-        # SysLog: what the software did - the log panel from Settings.
-        syslog = QWidget()
-        syslog_layout = QVBoxLayout(syslog)
-        syslog_layout.setContentsMargins(18, 16, 18, 16)
-        syslog_layout.addWidget(self.settings_view.logging_panel)
-        self._add_page("syslog", syslog, "SysLog",
-                       "What the software did: service events and their levels. No human "
-                       "actions - those are in the Audit Log.")
+        # SysLog: what the software did, service by service.
+        self.syslog_page = self._build_syslog()
+        self._page_index["syslog"] = self.pages.addWidget(self.syslog_page)
         # Settings keeps its tracking panel; the audit panel's work is the
         # Audit Log's here, with the chain and a filter by person.
         self.settings_view.audit_panel.hide()
 
-        # Audit Log: what people did, hash-chained - a second reading of the trail.
-        self.audit_view = ActivityView()
-        self.audit_view.people_panel.hide()
-        self.audit_view.set_admin(False)
-        self.audit_view.filter_changed.connect(lambda _: self._refresh_activity())
-        self.audit_view.verify_requested.connect(self.verify_audit_trail)
-        self._add_page("audit", self.audit_view, "Audit Log",
-                       "What people did: user, role, action and result, hash-chained so an "
-                       "altered record shows where it was altered.")
-        # New HSE Login: the account half of the Activity page.
-        self.activity_view.activity_panel.hide()
-        self.activity_view.integrity_panel.hide()
-        self._page_index["accounts"] = self._page_index["activity"]
-        self._retitle("activity", "New HSE Login",
-                      "Create, disable, reset and re-role accounts. Privileged changes "
-                      "ask for confirmation.")
+        # Audit Log: what people did, hash-chained.
+        self.audit_page = self._build_audit()
+        self._page_index["audit"] = self.pages.addWidget(self.audit_page)
+        # New HSE Login: accounts, and the form that creates them.
+        self.accounts_page = self._build_accounts()
+        self._page_index["accounts"] = self.pages.addWidget(self.accounts_page)
 
         self.tab_row.navigated.connect(self.navigate)
         self.shell_header.bell_clicked.connect(
@@ -219,6 +212,7 @@ class WorkspaceWindow(IngestFlow, HSEPages, MainWindow):
         self.profile_view.preference_changed.connect(prefs.set_value)
         if self.workspace == "admin":
             self.tab_row.set_note(f"{socket.gethostname()}  ·  v{__version__}")
+        self._apply_identity()
         self._refresh_shell()
 
     def _add_page(self, key: str, widget: QWidget, title: str, caption: str) -> None:
@@ -261,12 +255,18 @@ class WorkspaceWindow(IngestFlow, HSEPages, MainWindow):
             self._refresh_hotspots()
         elif key == "reports":
             self._refresh_reports()
+        elif key == "engines":
+            self._refresh_engines_page()
+        elif key == "settings":
+            self._refresh_settings_page()
         elif key == "profile":
             self._refresh_profile()
         elif key == "syslog":
-            self._refresh_logs()
-        elif key in ("audit", "accounts"):
-            self._refresh_activity()
+            self._refresh_syslog()
+        elif key == "audit":
+            self._refresh_audit_page()
+        elif key == "accounts":
+            self._refresh_accounts_page()
         elif key == "actions":
             self._refresh_actions()
         # A report opened from Home is part of the corpus view.
@@ -296,6 +296,8 @@ class WorkspaceWindow(IngestFlow, HSEPages, MainWindow):
                 self._refresh_hotspots()
             elif current == self._page_index.get("reports"):
                 self._refresh_reports()
+            elif current == self._page_index.get("engines"):
+                self._refresh_engines_page()
             self._refresh_ingest()
         return result
 
@@ -384,19 +386,19 @@ class WorkspaceWindow(IngestFlow, HSEPages, MainWindow):
                                         and entry.get("action") == "signed in")])
 
     def _refresh_logs(self) -> None:
-        if self.pages.currentIndex() == self._page_index.get("syslog"):
-            level = self.settings_view.level_box.currentText()
-            self.settings_view.set_log_rows(
-                [{"timestamp": entry.timestamp, "level": entry.level,
-                  "logger": entry.logger, "message": entry.message}
-                 for entry in self.ring.entries(level, limit=400)])
+        if getattr(self, "_shell_ready", False) and \
+                self.pages.currentIndex() == self._page_index.get("syslog"):
+            # The console's timer calls this every 1.5 s: that is the live tail.
+            if self.syslog_page.live.isChecked() or not self.syslog_page.table.rows:
+                self._refresh_syslog()
             return
         super()._refresh_logs()
 
     def _refresh_activity(self, view=None) -> None:
         super()._refresh_activity(view)
-        if view is None and hasattr(self, "audit_view"):
-            super()._refresh_activity(self.audit_view)
+        if view is None and hasattr(self, "audit_page") and \
+                self.pages.currentIndex() == self._page_index.get("audit"):
+            self._refresh_audit_page()
 
     @staticmethod
     def role_label_for(role: str) -> str:
@@ -408,6 +410,21 @@ class WorkspaceWindow(IngestFlow, HSEPages, MainWindow):
         result = super().on_analysis_completed(*args, **kwargs)
         self._refresh_shell()
         return result
+
+    def _refresh_engines(self) -> None:
+        super()._refresh_engines()
+        self._refresh_engines_page()
+
+    def on_probed(self, *args, **kwargs):
+        result = super().on_probed(*args, **kwargs)
+        self._refresh_engines_page()
+        return result
+
+    def _release_worker(self) -> None:
+        super()._release_worker()
+        if getattr(self, "_shell_ready", False) and \
+                self.pages.currentIndex() == self._page_index.get("engines"):
+            self._refresh_engines_page()
 
     def _apply_role(self) -> None:
         super()._apply_role()
@@ -560,15 +577,21 @@ class WorkspaceWindow(IngestFlow, HSEPages, MainWindow):
 
     @requires(MANAGE_USERS)
     def change_account_role(self, username: str, role: str = "") -> bool:
+        account = self.accounts.get(username) if self.accounts else None
+        if account is None:
+            return False
         if not role:
-            account = self.accounts.get(username) if self.accounts else None
-            if account is None:
-                return False
             role = "reviewer" if account.role == "admin" else "admin"
-            if not self._confirm(f"Change {account.full_name} to "
-                                 f"{ROLE_NAMES[role]}?"):
-                return False
-        return MainWindow.change_account_role.__wrapped__(self, username, role)
+        if role not in CREATABLE or role == account.role:
+            return False
+        if (role == "admin" or account.role == "admin") and not self._confirm(
+                f"Change {account.full_name} from {ROLE_NAMES.get(account.role)} to "
+                f"{ROLE_NAMES[role]}?\n\nAn administrator manages accounts and engines, "
+                "and cannot decide review cases."):
+            return False
+        changed = MainWindow.change_account_role.__wrapped__(self, username, role)
+        self._refresh_accounts_page()
+        return changed
 
     @requires(MANAGE_USERS)
     def toggle_account(self, username: str) -> bool:
@@ -577,7 +600,9 @@ class WorkspaceWindow(IngestFlow, HSEPages, MainWindow):
                 f"Disable {account.full_name}'s account?\n\nThey will not be able to "
                 "sign in until it is enabled again."):
             return False
-        return MainWindow.toggle_account.__wrapped__(self, username)
+        changed = MainWindow.toggle_account.__wrapped__(self, username)
+        self._refresh_accounts_page()
+        return changed
 
     def _confirm(self, question: str) -> bool:
         """The confirmation step for a privileged change - when a person is there."""

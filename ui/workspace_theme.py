@@ -443,8 +443,8 @@ QPlainTextEdit#Reader, QPlainTextEdit#ReaderMono {{
 QPlainTextEdit#ReaderMono {{ font-family: {MONO}; font-size: 12px; }}
 QLabel#LegendText {{ font-size: 13px; color: #3C4043; }}
 QFrame#CaseHead {{ background: #FFFFFF; border: none; border-bottom: 1px solid {HAIR}; }}
-QScrollArea#CaseScroll {{ background: #FFFFFF; border: none; }}
-QScrollArea#CaseScroll > QWidget > QWidget {{ background: #FFFFFF; }}
+QScrollArea#CaseScroll, QScrollArea#CardScroll {{ background: #FFFFFF; border: none; }}
+QScrollArea#CaseScroll > QWidget > QWidget, QScrollArea#CardScroll > QWidget > QWidget {{ background: #FFFFFF; }}
 QLabel#CaseRef {{ font-family: {MONO}; font-size: 19px; font-weight: 600; color: #1F2328; }}
 QLabel#CaseMeta {{ font-size: 13px; color: #5F6368; }}
 QFrame#Assessment {{ border: 1px dashed #9A9E99; border-radius: 2px; background: #FAFBFA; }}
@@ -485,6 +485,63 @@ QLabel#InlineMono {{ font-family: {MONO}; font-size: 14px; font-weight: 600; col
 QLabel#SideTitle {{ font-size: 14px; font-weight: 600; color: #1F2328; }}
 QLabel#SideText {{ font-size: 14px; color: #1F2328; }}
 QLabel#SideFaint {{ font-size: 14px; color: #6B6F74; }}
+QFrame#CardFoot {{ background: #FFFFFF; border: none; border-top: 1px solid {HAIR}; }}
+QLabel#MonoFaint {{ font-family: {MONO}; font-size: 12px; color: #6B6F74; }}
+QRadioButton {{ spacing: 8px; background: transparent; }}
+QRadioButton::indicator {{
+    width: 14px; height: 14px; border-radius: 8px; border: 1px solid #9A9E99; background: #FFFFFF;
+}}
+QRadioButton::indicator:checked {{ border: 5px solid {NAVY}; width: 6px; height: 6px; }}
+QSpinBox {{ background: #FFFFFF; border: 1px solid #C4C7C2; border-radius: 3px; padding: 6px 8px; }}
+QListWidget#SettingsNav {{ background: #FFFFFF; border: none; outline: none; font-size: 14px; }}
+QListWidget#SettingsNav::item {{
+    padding: 9px 14px; border: none; border-left: 3px solid transparent; color: #1F2328;
+}}
+QListWidget#SettingsNav::item:selected {{
+    background: #F4F1EA; color: #111111; border-left: 3px solid {AMBER}; font-weight: 600;
+}}
+QListWidget#SettingsNav::item:hover:!selected {{ background: #F7F7F5; }}
+QLabel#ChainBanner {{
+    background: #EAF4EC; border: 1px solid #A8D5B2; border-radius: 3px; padding: 10px 14px;
+    color: #1F2328; font-size: 14px;
+}}
+QLabel#ChainBanner[ok="false"] {{ background: #FCEDEC; border-color: #E7B0AB; color: #B3261E; }}
+QLabel#ValueBox, QLabel#ValueBoxNew {{
+    border: 1px solid {LINE}; border-radius: 3px; padding: 8px 10px; font-size: 13px; background: #FFFFFF;
+}}
+QLabel#ValueBoxNew {{ border: 1px solid #1E2327; }}
+QLabel#PermissionBox {{ border: 1px solid {LINE}; border-radius: 3px; padding: 6px 10px; font-size: 13px; }}
+QLabel#ErrorText {{ color: #B3261E; font-size: 13px; }}
+QPushButton#Small {{ padding: 4px 7px; font-size: 13px; }}
+QPushButton#SmallDanger {{ padding: 4px 7px; font-size: 13px; color: #B3261E; border-color: #B3261E; }}
+QPushButton#SmallDanger:hover {{ background: #B3261E; color: #FFFFFF; }}
+QFrame#LoginSide {{ background: {PAGE}; }}
+QLabel#LoginMark {{
+    border: 1.5px solid #C9CCD1; border-radius: 19px; color: #FFFFFF;
+    font-family: {MONO}; font-size: 11px; font-weight: 600;
+}}
+QLabel#LoginOrg {{ color: #FFFFFF; font-size: 16px; font-weight: 600; }}
+QLabel#LoginDept {{ color: #A9ADB3; font-size: 13px; }}
+QLabel#LoginWordmark {{ color: #E8EAEC; font-size: 52px; font-weight: 700; letter-spacing: 14px; }}
+QLabel#LoginTagline {{ color: #A9ADB3; font-family: {MONO}; font-size: 14px; letter-spacing: 3px; }}
+QLabel#LoginAbout {{ color: #D5D8DC; font-size: 17px; }}
+QLabel#LoginStep {{
+    color: #C9CCD1; font-family: {MONO}; font-size: 13px; padding: 6px 10px;
+    border: 1px solid #4A5057; margin-right: -1px;
+}}
+QLabel#LoginStep[last="true"] {{ color: #FFFFFF; border: 1px solid #C9CCD1; background: #2E3439; font-weight: 600; }}
+QLabel#LoginFoot {{ color: #8C9096; font-family: {MONO}; font-size: 12px; }}
+QLabel#LoginTitle {{ font-size: 24px; font-weight: 600; color: #1F2328; }}
+QLabel#LoginWhy {{ font-size: 13px; color: #5F6368; }}
+QLabel#LoginNote {{ font-size: 13px; color: #5F6368; }}
+QFrame#LoginRule {{ background: {LINE}; border: none; }}
+QLineEdit#PasswordField {{ border-top-right-radius: 0; border-bottom-right-radius: 0; }}
+QPushButton#ShowPassword {{ border-top-left-radius: 0; border-bottom-left-radius: 0; margin-left: -1px; }}
+QPushButton#LoginPrimary {{
+    background-color: {NAVY}; border: 1px solid {NAVY}; color: #FFFFFF;
+    padding: 11px 16px; font-size: 15px; font-weight: 600;
+}}
+QPushButton#LoginPrimary:hover {{ background-color: #173A5A; color: #FFFFFF; }}
 QLabel#TriggerCount {{ font-size: 14px; font-weight: 600; color: #1F2328; }}
 QLabel#KvValue {{ color: #1F2328; font-size: 14px; }}
 QLabel#KvMono {{ color: #1F2328; font-size: 14px; font-family: {MONO}; }}

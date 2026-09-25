@@ -19,7 +19,7 @@ from sif import SEED_REPORTS
 from sif import prefs
 from sif.accounts import ANALYSE, DECIDE
 from sif.llm import looks_non_latin
-from sif.ocr import IMAGE_SUFFIXES, PDF_SUFFIXES, PaddleOCRBackend
+from sif.ocr import IMAGE_SUFFIXES, PDF_SUFFIXES
 from sif.review import fingerprint
 
 from .dashboard import DashboardPage
@@ -28,8 +28,8 @@ from .hotspots import HotspotsPage
 from .ingest import IngestPage
 from .reports import ReportsPage
 from .review import ReviewPage
-from .present import (age, case_line, describe_action, initials, queued_at, received,
-                      review_status, row_when, trigger_counts, weekly_series)
+from .present import (age, case_line, describe_action, queued_at, received, review_status,
+                      row_when, trigger_counts, weekly_series)
 
 __all__ = ["HSEPages"]
 

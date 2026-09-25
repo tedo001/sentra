@@ -101,7 +101,10 @@ def main(argv: list[str] | None = None) -> int:
         argv = enter_presentation(argv)
     application = create_application(argv)
     workspace_theme.prepare()
-    return run_signed_in(application, build_window, workspace_theme.STYLESHEET)
+    from ui4.login import WorkspaceLogin
+
+    return run_signed_in(application, build_window, workspace_theme.STYLESHEET,
+                         dialog_class=WorkspaceLogin)
 
 
 if __name__ == "__main__":

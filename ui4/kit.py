@@ -18,8 +18,7 @@ from dataclasses import dataclass
 from typing import Callable, Dict, List, Optional, Sequence, Tuple
 
 from PyQt6.QtCore import QPointF, QRect, QRectF, QSize, Qt, pyqtSignal
-from PyQt6.QtGui import (QBrush, QColor, QFont, QFontMetrics, QPainter, QPainterPath,
-                         QPen)
+from PyQt6.QtGui import (QColor, QFont, QFontMetrics, QPainter, QPainterPath, QPen)
 from PyQt6.QtWidgets import (
     QAbstractItemView,
     QButtonGroup,
@@ -483,6 +482,7 @@ class DesignTable(QTableWidget):
         self.clearContents()
         self.setRowCount(len(self.rows))
         mono = QFont(self.mono_family)
+        mono.setPixelSize(13)
         for r, row in enumerate(self.rows):
             for c, column in enumerate(self.columns):
                 value = column.read(row)
@@ -509,12 +509,16 @@ class DesignTable(QTableWidget):
                 if column.kind == "muted":
                     item.setForeground(QColor(MUTED))
                 if column.style is not None:
-                    colour, bold = column.style(row)
+                    styled = column.style(row)
+                    colour, bold = styled[0], styled[1]
+                    strike = len(styled) > 2 and styled[2]
                     if colour:
                         item.setForeground(QColor(colour))
-                    if bold:
+                    if bold or strike:
                         heavy = QFont(item.font())
-                        heavy.setWeight(QFont.Weight.DemiBold)
+                        if bold:
+                            heavy.setWeight(QFont.Weight.DemiBold)
+                        heavy.setStrikeOut(bool(strike))
                         item.setFont(heavy)
                 align = (Qt.AlignmentFlag.AlignRight if column.align == "right"
                          else Qt.AlignmentFlag.AlignLeft)

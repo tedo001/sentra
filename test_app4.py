@@ -74,6 +74,12 @@ class TestBuildFour(unittest.TestCase):
 
         self.store = AccountStore(os.path.join(folder, "users.json"), iterations=FAST)
         self.decisions_path = os.path.join(folder, "decisions.json")
+        # Settings and "remember me" write preferences; never into a real profile.
+        from sif import prefs
+
+        original_prefs = prefs._path
+        prefs._path = lambda: os.path.join(folder, "prefs.json")
+        self.addCleanup(setattr, prefs, "_path", original_prefs)
 
     @staticmethod
     def _restore(palette, look) -> None:
@@ -211,18 +217,28 @@ class TestBuildFour(unittest.TestCase):
         self.assertEqual(self._current(window), "reports")
         self.assertTrue(window.tab_row.buttons["dashboard"].isChecked())
 
-    def test_syslog_holds_the_service_log_and_audit_the_chain(self) -> None:
+    def test_syslog_audit_log_and_accounts_are_the_design_s_pages(self) -> None:
+        import logging
+
         window = self._window("admin", "d.manikandan")
+        logging.getLogger("sif.ocr").warning("low confidence 0.61 on a test photo")
         window.navigate("syslog")
-        self.assertIs(window.settings_view.logging_panel.window(), window)
-        self.assertTrue(window.settings_view.audit_panel.isHidden())
+        page = window.syslog_page
+        self.assertTrue(page.table.rows, "the service log is listed")
+        page.levels.select("WARNING")
+        page.levels.changed.emit("WARNING")
+        self.assertTrue(all(row["level"] == "WARNING" for row in page.table.rows))
+        self.assertIn("OCR", [row["service"] for row in page.table.rows])
+
         window.navigate("audit")
         window.verify_audit_trail()
-        self.assertIn("Chain intact", window.audit_view.chain_label.text())
-        self.assertTrue(window.audit_view.people_panel.isHidden())
+        self.assertIn("Chain intact", window.audit_page.banner.text())
+        self.assertTrue(all(row.get("category") == "functionality"
+                            for row in window.audit_page.table.rows), "human actions only")
+
         window.navigate("accounts")
-        self.assertFalse(window.activity_view.add_button.isHidden())
-        self.assertTrue(window.activity_view.activity_panel.isHidden())
+        self.assertEqual(self._current(window), "accounts")
+        self.assertIn("d.manikandan", [row["username"] for row in window.accounts_page.accounts])
 
     def test_the_account_menu_signs_out(self) -> None:
         window = self._window("reviewer", "a.baruah")
@@ -374,6 +390,204 @@ class TestBuildFour(unittest.TestCase):
         header = self._header(folder)
         self.assertEqual(header.mark.objectName(), "OilLogo")
         self.assertTrue(header.organisation.isHidden())
+
+    # -- the design's pages ----------------------------------------------------------
+
+    def test_home_asks_for_the_critical_cases_first(self) -> None:
+        window = self._window("reviewer", "a.baruah")
+        self._analyse(window)
+        window.navigate("home")
+        page = window.home_page
+        self.assertEqual(page.stats.cells[0].value.text(), str(len(window.rows)))
+        alerts = [page.attention.body.itemAt(i).widget()
+                  for i in range(page.attention.body.count())]
+        alerts = [alert for alert in alerts if alert is not None and alert.objectName() == "Alert"]
+        self.assertTrue(alerts, "a critical case needs someone")
+        self.assertEqual(alerts[0].property("tone"), "critical")
+        critical = [row for row in window.rows if float(row["risk_score"]) >= 85]
+        top = max(critical, key=lambda row: float(row["risk_score"]))
+        alerts[0].button.click()
+        self.assertEqual(self._current(window), "review")
+        self.assertEqual(window.review_page.current, str(top["reference"]))
+
+    def test_ingest_works_a_csv_through_the_queue(self) -> None:
+        window = self._window("reviewer", "a.baruah")
+        sample = os.path.join(os.path.dirname(os.path.abspath(__file__)), "samples",
+                              "near_miss_reports.csv")
+        self.assertEqual(window.stage_files([sample]), 1)
+        self.assertEqual(window.ingest_items[0]["state"], "queued")
+        self.assertTrue(window.ingest_page.start.isEnabled())
+        window.start_processing()
+        self.assertIsNotNone(window.worker)
+        self.assertTrue(window.worker.wait(120_000))
+        for _ in range(5):
+            self.app.processEvents()
+        item = window.ingest_items[0]
+        self.assertEqual((item["state"], item["stage"]), ("done", "Review"))
+        self.assertEqual(item["reports"], len(window.rows))
+        self.assertTrue(all(row.get("source") == "near_miss_reports.csv" for row in window.rows))
+        self.assertTrue(window.rows[0].get("site"), "the export's site is kept")
+        self.assertTrue(window.rows[0].get("reported_on"), "and its date")
+        window.navigate("ingest")
+        self.assertTrue(window.ingest_page.pipeline.cells[0].value.text().startswith("1 "))
+
+    def test_a_viewer_cannot_stage_files(self) -> None:
+        window = self._window("viewer", "v.person")
+        self.assertIsNone(window.stage_files(["whatever.csv"]))
+        self.assertEqual(window.ingest_items, [])
+
+    def test_hse_review_decides_under_the_signed_in_person(self) -> None:
+        window = self._window("reviewer", "a.baruah")
+        self._analyse(window)
+        window.navigate("review")
+        page = window.review_page
+        opened = int(page.tabs.tabText(0).split()[-1])
+        self.assertEqual(opened, window.outstanding_reviews)
+        reference = page.current
+        self.assertTrue(reference)
+        self.assertTrue(window.decide_case(reference, "confirmed"))
+        entry = window.decisions.entries[-1]
+        self.assertEqual((entry.reference, entry.decision), (reference, "confirmed"))
+        self.assertEqual(entry.reviewer, "Reviewer Person (a.baruah)")
+        self.assertEqual(int(page.tabs.tabText(0).split()[-1]), opened - 1)
+        self.assertIn("reviewed", next(row["_in"] for row in page.rows
+                                       if row["reference"] == reference))
+
+    def test_a_viewer_reads_cases_but_the_decision_bar_is_shut(self) -> None:
+        window = self._window("viewer", "v.person")
+        self.assertFalse(window.review_page.bar.confirm.isEnabled())
+        self.assertFalse(window.decide_case("SEED-01", "confirmed"))
+
+    def test_the_dashboard_filters_by_site(self) -> None:
+        window = self._window("reviewer", "a.baruah")
+        sample = os.path.join(os.path.dirname(os.path.abspath(__file__)), "samples",
+                              "near_miss_reports.csv")
+        window._start(window._analysis_worker(csv_path=sample))
+        self.assertTrue(window.worker.wait(120_000))
+        self.app.processEvents()
+        window.navigate("dashboard")
+        page = window.dashboard_page
+        page.period.select("365")
+        page.period.changed.emit("365")
+        self.assertEqual(page.stats.cells[0].value.text(), str(len(window.rows)))
+        site = str(window.rows[0]["site"])
+        page.site.setCurrentIndex(page.site.findData(site))
+        expected = sum(1 for row in window.rows if row.get("site") == site)
+        self.assertEqual(page.stats.cells[0].value.text(), str(expected))
+
+    def test_hotspots_rank_by_the_wilson_lower_bound(self) -> None:
+        from sif.patterns import wilson_lower_bound
+
+        window = self._window("reviewer", "a.baruah")
+        sample = os.path.join(os.path.dirname(os.path.abspath(__file__)), "samples",
+                              "near_miss_reports.csv")
+        window._start(window._analysis_worker(csv_path=sample))
+        self.assertTrue(window.worker.wait(120_000))
+        self.app.processEvents()
+        window.navigate("hotspots")
+        spots = window.hotspots_page.table.rows
+        self.assertTrue(spots)
+        densities = [spot["density"] for spot in spots]
+        self.assertEqual(densities, sorted(densities, reverse=True))
+        top = spots[0]
+        self.assertAlmostEqual(top["density"],
+                               wilson_lower_bound(top["sif_reports"], top["reports"]))
+        self.assertEqual(len(window.hotspots_page.incident_table.rows), top["reports"])
+
+    def test_a_reference_opens_the_report_page(self) -> None:
+        window = self._window("reviewer", "a.baruah")
+        self._analyse(window)
+        reference = str(window.rows[2]["reference"])
+        window.open_report(reference)
+        self.assertEqual(self._current(window), "reports")
+        self.assertEqual(window.reports_page.current, reference)
+        self.assertEqual(window.reports_page.case.reference.text(), reference)
+
+    def test_engines_show_real_state_and_training_is_guarded(self) -> None:
+        admin = self._window("admin", "d.manikandan")
+        admin.navigate("engines")
+        cards = admin.engines_page.cards
+        self.assertEqual(set(cards), {"encoder", "ocr", "llm", "risk", "model", "tracking"})
+        self.assertIn(admin.llm.host, cards["llm"].facts.values["Host"].text())
+        self.assertIn("No reviewed decisions", admin.run_evaluation())
+        analyst = self._window("reviewer", "a.baruah")
+        self.assertIsNone(analyst.toggle_model())
+        refused = [e["detail"]["attempted"] for e in self._actions()
+                   if e["action"] == "permission refused"]
+        self.assertIn("toggle_model", refused)
+
+    def test_a_setting_change_records_what_it_replaced(self) -> None:
+        admin = self._window("admin", "d.manikandan")
+        admin.navigate("settings")
+        self.assertTrue(admin.change_setting("project_code", "PS 26165-B"))
+        self.assertEqual(admin.shell_header.project.text(), "PS 26165-B")
+        entry = [e for e in self._actions() if e["action"] == "setting changed"][-1]
+        self.assertEqual((entry["detail"]["previous"], entry["detail"]["new"]),
+                         ("PS 26165", "PS 26165-B"))
+        self.assertFalse(admin.change_setting("no_such_setting", 1))
+        analyst = self._window("reviewer", "a.baruah")
+        self.assertIsNone(analyst.change_setting("project_code", "X"))
+
+    def test_an_administrator_creates_an_hse_login_that_signs_in_by_email(self) -> None:
+        admin = self._window("admin", "d.manikandan")
+        password = admin.create_hse_account({
+            "full_name": "Priyanka Saikia", "email": "p.saikia@oilindia.in",
+            "username": "p.saikia", "role": "reviewer", "site": "Rig S-12 Moran",
+            "department": "HSE — Field Operations", "active": True})
+        self.assertEqual(len(password), 12)
+        account = self.store.get("p.saikia")
+        self.assertEqual((account.email, account.site), ("p.saikia@oilindia.in", "Rig S-12 Moran"))
+        session = self.store.authenticate("p.saikia@oilindia.in", password)
+        self.assertEqual(session.username, "p.saikia")
+        self.assertTrue(admin.change_account_role("p.saikia", "viewer"))
+        change = [e for e in self._actions() if e["action"] == "role changed"][-1]
+        self.assertEqual((change["detail"]["previous"], change["detail"]["role"]),
+                         ("reviewer", "viewer"))
+        from ui4.auditlog import describe_entry
+
+        row = describe_entry(change)
+        self.assertEqual((row["previous"], row["new"]), ("HSE Analyst", "Viewer"))
+
+    def test_the_sign_in_screen_keeps_the_login_logic(self) -> None:
+        from sif.audit import AuditLog
+        from ui4.login import WorkspaceLogin
+
+        empty = AccountStore(os.path.join(os.path.dirname(self.audit_path), "none.json"),
+                             iterations=FAST)
+        self.assertEqual(WorkspaceLogin(empty, AuditLog(self.audit_path)).page, "setup")
+        self.store.create("a.baruah", "Anupam Baruah", "reviewer", PASSWORD)
+        self.store.set_profile("a.baruah", email="a.baruah@oilindia.in")
+        dialog = WorkspaceLogin(self.store, AuditLog(self.audit_path))
+        self.assertEqual(dialog.page, "sign in")
+        dialog.username.setText("a.baruah@oilindia.in")
+        dialog.password.setText("wrong password")
+        dialog.sign_in()
+        self.assertIsNone(dialog.session)
+        self.assertEqual(self._actions()[-1]["action"], "sign-in refused")
+        dialog.password.setText(PASSWORD)
+        dialog.remember.setChecked(True)
+        dialog.sign_in()
+        self.assertEqual(dialog.session.username, "a.baruah")
+        again = WorkspaceLogin(self.store, AuditLog(self.audit_path))
+        self.assertEqual(again.username.text(), "a.baruah@oilindia.in")
+
+    def test_the_profile_shows_the_account_s_particulars(self) -> None:
+        window = self._window("reviewer", "a.baruah")
+        self.store.set_profile("a.baruah", email="a.baruah@oilindia.in",
+                               site="Duliajan Field HQ", department="HSE — Field Operations")
+        window.navigate("profile")
+        values = window.profile_view.fields.values
+        self.assertEqual(values["Email"].text(), "a.baruah@oilindia.in")
+        self.assertEqual(window.profile_view.inline["site"].text(), "Duliajan Field HQ")
+
+    def test_the_bundled_fonts_load(self) -> None:
+        from PyQt6.QtGui import QFontDatabase
+
+        from ui import workspace_theme
+
+        self.assertTrue(workspace_theme.load_fonts())
+        self.assertIn("IBM Plex Sans", QFontDatabase.families())
+        self.assertIn("IBM Plex Mono", QFontDatabase.families())
 
     # -- the entry point -------------------------------------------------------
 

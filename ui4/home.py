@@ -8,10 +8,10 @@ their review status; and today's activity.
 
 from __future__ import annotations
 
-from typing import Dict, List, Sequence, Tuple
+from typing import Dict, Sequence, Tuple
 
 from PyQt6.QtCore import pyqtSignal
-from PyQt6.QtWidgets import QGridLayout, QLabel, QPushButton, QVBoxLayout, QWidget
+from PyQt6.QtWidgets import QGridLayout, QLabel, QPushButton, QWidget
 
 from .kit import (AlertRow, Card, Col, DesignTable, Page, StatStrip, Timeline, clear_layout,
                   link_button)

@@ -11,16 +11,15 @@ document's extracted text, its source and its processing log.
 from __future__ import annotations
 
 import os
-from typing import Dict, List, Optional, Sequence, Tuple
+from typing import Dict, Sequence
 
-from PyQt6.QtCore import QRectF, QSize, Qt, QTimer, pyqtSignal
+from PyQt6.QtCore import QRectF, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QColor, QPainter, QPen
 from PyQt6.QtWidgets import (
     QCheckBox,
     QComboBox,
     QFileDialog,
     QFrame,
-    QGridLayout,
     QHBoxLayout,
     QLabel,
     QLineEdit,

@@ -904,12 +904,14 @@ class MainWindow(QMainWindow):
             if not ok:
                 return False
             role = ROLES[labels.index(choice)]
+        previous = account.role
         try:
             store.set_role(username, role)
         except AuthError as exc:
             QMessageBox.warning(self, APP_NAME, str(exc))
             return False
-        self.audit.functionality("role changed", username=username, role=role)
+        self.audit.functionality("role changed", username=username, role=role,
+                                 previous=previous)
         self._refresh_activity()
         return True
 
@@ -2073,14 +2075,19 @@ def create_application(argv: Optional[List[str]] = None) -> QApplication:
     return app
 
 
-def run_signed_in(application: QApplication, build_window, stylesheet: str = "") -> int:
+def run_signed_in(application: QApplication, build_window, stylesheet: str = "",
+                  dialog_class=None) -> int:
     """Sign someone in, run the console for them, and repeat after a sign-out.
 
     Both entry points run through here, so neither can open the console
     without a person signed in. ``build_window(session, accounts)`` builds the
-    window for that person; ``stylesheet`` dresses the sign-in page to match.
+    window for that person; ``stylesheet`` dresses the sign-in page to match,
+    and ``dialog_class`` may lay it out differently (it must behave as
+    :class:`ui2.login.LoginDialog` does).
     """
     from ui2.login import LoginDialog
+
+    LoginDialog = dialog_class or LoginDialog  # noqa: N806 - the class to show
 
     try:
         store = AccountStore()
