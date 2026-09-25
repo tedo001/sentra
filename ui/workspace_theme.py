@@ -590,6 +590,44 @@ QFrame#DayCell QPushButton#MoreLink {{
     padding: 2px 6px;
 }}
 QFrame#DayCell QPushButton#MoreLink:hover {{ color: {NAVY}; text-decoration: underline; }}
+
+/* ---- pop-ups: always white, wherever they open ----------------------------
+   A menu opened from the dark title row is that row's child, and the row's
+   "every widget transparent, white text" rule reached it: Windows then drew
+   the menu black with dark items on it. These selectors outrank that rule. */
+QMenu, QFrame#WorkspaceHeader QMenu, QFrame#TabRow QMenu, QFrame#Card QMenu,
+QWidget#DesignPage QMenu {{
+    background-color: #FFFFFF;
+    color: #1F2328;
+    border: 1px solid #C4C7C2;
+    padding: 4px;
+}}
+QMenu::item, QFrame#WorkspaceHeader QMenu::item {{
+    background: transparent;
+    color: #1F2328;
+    padding: 7px 28px 7px 16px;
+}}
+QMenu::item:selected, QFrame#WorkspaceHeader QMenu::item:selected {{
+    background-color: #EEF2F6;
+    color: {NAVY};
+}}
+QMenu::item:disabled, QFrame#WorkspaceHeader QMenu::item:disabled {{ color: #5F6368; }}
+QMenu::separator, QFrame#WorkspaceHeader QMenu::separator {{
+    height: 1px;
+    background: #E0E1DD;
+    margin: 4px 8px;
+}}
+QComboBox QAbstractItemView, QFrame#WorkspaceHeader QComboBox QAbstractItemView {{
+    background-color: #FFFFFF;
+    color: #1F2328;
+    border: 1px solid #C4C7C2;
+    outline: none;
+    selection-background-color: #EEF2F6;
+    selection-color: {NAVY};
+}}
+QComboBox QFrame {{ background-color: #FFFFFF; }}
+QComboBox QAbstractItemView::item {{ min-height: 26px; padding: 0 8px; color: #1F2328; }}
+QComboBox QAbstractItemView::item:hover {{ background-color: #EEF2F6; }}
 """
 
 

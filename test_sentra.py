@@ -360,6 +360,34 @@ class TestSentra(unittest.TestCase):
         self.assertIsNotNone(dialog.session)
         self.assertEqual(dialog.session.username, "a.baruah")
 
+    # -- pop-ups ---------------------------------------------------------------------------------
+
+    def _menu_is_opaque_white(self, menu) -> None:
+        from PyQt6.QtCore import QPoint
+
+        menu.popup(QPoint(100, 100))
+        self.app.processEvents()
+        image = menu.grab().toImage()
+        menu.hide()
+        colour = image.pixelColor(image.width() // 2, image.height() - 6)
+        self.assertEqual((colour.name(), colour.alpha()), ("#ffffff", 255))
+
+    def test_menus_from_the_dark_title_row_are_white_not_transparent(self) -> None:
+        # The title row's "transparent, white text" rule used to reach its own
+        # menus, which Windows then drew black with dark items on them.
+        import app4
+
+        window = self._window("admin")
+        window.show()
+        self._menu_is_opaque_white(window.shell_header.menu)
+        self._menu_is_opaque_white(window.llm_button.menu_)
+        window.close()
+        session = self.store.authenticate("admin.person", PASSWORD)
+        other = app4.build_window(session, self.store)
+        self.addCleanup(other.close)
+        other.show()
+        self._menu_is_opaque_white(other.shell_header.menu)
+
     # -- nothing leaks ---------------------------------------------------------------------------
 
     def test_app4_keeps_its_own_look_after_sentra_ran(self) -> None:

@@ -9,30 +9,22 @@
 Prototype for **Oil India Limited — Problem Statement 26165**: turning raw
 Unsafe Act / Unsafe Condition (UA/UC) and near-miss reports into structured,
 decision-grade **SIF (Serious Injury & Fatality) intelligence**.
-The engine is SENTRA; `sif/` remains the package name, and the settings folder
-keeps its old name so an existing operator's review decisions are not orphaned.
+The application is `sentra.py`; `sif/` remains the engine's package name, and the
+settings folder keeps its old name (`SIF Insight Console`) so an existing
+operator's accounts, audit trail and review decisions are not orphaned.
 
-![The reports page](docs/ui-reports.png)
+![SENTRA dashboard](docs/sentra-dashboard.png)
 
-*Every analysed report, the verdict, and the cues behind it. The console ships
-in this design; `app2.py` runs the same window in a deep-navy one.*
-
-| | |
-| --- | --- |
-| ![Workflow map](docs/ui-workflow.png) | ![Dashboard](docs/ui-dashboard.png) |
-| **Workflow map** — every capability, its live status on this machine, and its own control. | **Dashboard** — headline metrics and the exposure charts for the whole corpus. |
-| ![Risk hotspots](docs/ui-hotspots.png) | ![Human review](docs/ui-review.png) |
-| **Risk hotspots** — repeats ranked by SIF-precursor density, not by volume. | **Human review** — the queue on the left, the whole case and three keys on the right. |
-| ![Ingest and OCR](docs/ui-ingest.png) | ![Engines](docs/ui-engines.png) |
-| **Ingest** — text, CSV, PDFs, scans and photographs, in twelve languages. | **Engines** — what is installed on this machine and what each one is doing. |
+*The HSE Dashboard: five headline figures, SIF exposure by IOGP rule, failed
+barrier controls, the latest reports and the weekly risk trend.*
 
 > **Start here:** [USING_SENTRA.md](USING_SENTRA.md) — the click-by-click flow,
 > from first launch to working the review queue.
 >
 > **Operating manual:** [INSTRUCTION.md](INSTRUCTION.md) — the rules the system
-> must be used under, step-by-step install and daily process, how to train the
-> model on reviewed labels, and what has to change before it is trusted on live
-> safety data.
+> must be used under, install and daily process, how to train the model on
+> reviewed labels, and what has to change before it is trusted on live safety
+> data.
 >
 > **Building the installer:** [packaging/INNO_SETUP.md](packaging/INNO_SETUP.md)
 > — PyInstaller and Inno Setup, step by step, and how to publish a release.
@@ -41,183 +33,217 @@ in this design; `app2.py` runs the same window in a deep-navy one.*
 > — how the engine decides, the models and data, every test result, and what is
 > still missing.
 
-## Sign-in and a record of who did what
-
-Every session begins with a sign-in, and everything the console records carries
-the account that did it: each analysed report says who analysed it, each review
-decision is recorded under the signed-in person, and the audit trail names the
-user on every entry.
+## What SENTRA is today
 
 | | |
 | --- | --- |
-| ![Sign in](docs/access-signin.png) | ![Activity](docs/access-activity.png) |
+| **One sign-in, two workspaces** | The account decides which one opens. An **HSE Analyst** ingests, analyses, decides review cases, tracks compliance actions and investigates hotspots. An **Administrator** runs the engines, settings, logs, accounts and data - and records no review decisions, so platform control and safety judgement stay in separate hands. |
+| **The engine** | Three opinions on every report - deterministic IOGP rules, a semantic encoder and a learned XGBoost model - fused so recall only grows, with the evidence for every verdict. |
+| **gemma2:latest, always on** | The local LLM (through Ollama) is switched on from the start as a fourth opinion and the translator for reports not written in English. A button in the title row shows whether it is answering. |
+| **Human review** | Nothing the engine calls SIF-potential closes without a person. Decisions are signed, persisted and become the labels training uses. |
+| **Local SQL database** | Every report, decision, action item and audit entry is kept in SQLite (or a shared PostgreSQL / MySQL server) and loaded at the next start. |
+| **Vector database** | Each report's embedding, for "find reports like this one". |
+| **Data sync and cloud backup** | Sync workstations through the shared database; back everything up, encrypted, to a synced cloud folder, S3-compatible storage or WebDAV, on demand or on a schedule; verify and restore. |
+| **A tamper-evident trail** | Every action is written to a hash-chained audit log with the person who did it. |
 
-* **No default password.** The first start on a machine creates the administrator.
-* **Four roles** — Viewer, HSE Analyst, HSE Expert, Administrator — each able to do
-  everything the one before can. The check is on the action, not the button.
+## The HSE workspace
+
+| | |
+| --- | --- |
+| ![Home](docs/sentra-home.png) | ![Ingest](docs/sentra-ingest.png) |
+| **Home** — what needs you now: critical cases oldest first, open cases by trigger, recent incidents and your recent activity. | **Ingest** — CSV exports, PDFs, scans and photographs, or a pasted narrative, through OCR, extraction, translation and analysis, with a log per document. |
+| ![Dashboard](docs/sentra-dashboard.png) | ![HSE Review](docs/sentra-review.png) |
+| **Dashboard** — last 30 / 90 days or 12 months, by site and activity: SIF exposure by rule, failed barriers, recent reports and the weekly trend (line or bar). | **HSE Review** — the case list beside the case: engine assessment (not a decision), the report in English, evidence and reasoning, and three keys to decide it. |
+| ![Action Items](docs/sentra-actions.png) | ![Risk Hotspots](docs/sentra-hotspots.png) |
+| **Action Items** — the compliance calendar: recurring and corrective HSE work by category, month or week, with what is due next. | **Risk Hotspots** — repeats ranked by SIF-precursor density (Wilson lower bound), not by report count, with each site's incidents, activities and barrier failures. |
+
+**Profile** holds the person's details, password change, preferences, their own
+activity and their sign-in history.
+
+![Profile](docs/sentra-profile.png)
+
+## Administration
+
+| | |
+| --- | --- |
+| ![Engines](docs/sentra-admin-engines.png) | ![Data & Backup](docs/sentra-admin-data.png) |
+| **Engines** — the encoder, OCR, the local LLM, the learned model and the risk scorer: what is installed, whether it is running, and the controls for each. | **Data & Backup** — the SQL database, the vector index, cloud backup and the sync log (see below). |
+| ![Settings](docs/sentra-admin-settings.png) | ![SysLog](docs/sentra-admin-syslog.png) |
+| **Settings** — General, Organization, Users & Roles, Models, Security, Storage and Notifications; e.g. a reason required to overturn the engine. Every change is audited with the value it replaced. | **SysLog** — what the software did, service by service, with a live tail and export. |
+| ![Audit Log](docs/sentra-admin-audit.png) | ![New HSE Login](docs/sentra-admin-accounts.png) |
+| **Audit Log** — what people did, hash-chained, with the previous and new value of every change and a check of the chain. | **New HSE Login** — create accounts with a one-time password, change roles, reset passwords, disable and enable. |
+
+## The title row
+
+| |
+| --- |
+| ![The account menu and the gemma2:latest menu](docs/sentra-menus.png) |
+
+* **The OIL emblem**, the organisation and "Health, Safety and Environment" on
+  the left; **SENTRA** and the workspace in the middle.
+* **gemma2:latest** — the local LLM's state as a coloured dot: **green** ready,
+  **amber** checking or the model not pulled yet (`ollama pull gemma2:latest`),
+  **red** the Ollama host is not answering (reports are still analysed by the
+  other three engines; the LLM opinion and translation wait until it answers),
+  **grey** switched off by an administrator. Press it to check again. For an
+  administrator the arrow opens *Check the connection now*, *Turn the LLM
+  analyser off / on* and *Host and model settings…*; nobody else can switch it
+  off, and the choice is kept between sessions.
+* **The bell** counts what needs a person: cases waiting in the HSE workspace,
+  refused sign-ins and permission refusals today in Administration.
+* **The account menu** — name, username, role and project, then *My profile*,
+  *Preferences* / *System settings* and *Sign out*.
+
+Every menu and drop-down list opens white with dark text wherever it is opened
+from, including the dark title row, and a test measures the rendered pop-up so
+it cannot turn transparent (black on Windows) again.
+
+## Sign-in and a record of who did what
+
+![Sign in](docs/sentra-signin.png)
+
+* **No default password.** The first start on a machine creates the
+  administrator; everyone else is created on *New HSE Login* and signs in by
+  username or email with a one-time password they must change.
 * **Passwords are never stored** — a salted PBKDF2-HMAC-SHA256 digest at 600,000
   iterations. Five wrong attempts lock an account for five minutes.
-* **A tamper-evident trail.** Each audit entry carries the hash of the one before
-  it; the Activity page shows whether the chain is intact and where it broke.
+* **Every record names its person.** Each analysed report says who analysed it,
+  each review decision is signed by the person signed in, and every audit entry
+  carries the user.
+* **The check is on the action, not the button.** A refused action is refused
+  from a click, a shortcut or a menu alike, and the refusal is itself audited.
 
+## Data, sync and backup
+
+All of this is on the administrator's **Data & Backup** tab.
+
+* **Local SQL database.** `sentra.db` (SQLite) sits beside the accounts and the
+  audit trail in the per-user folder. Every analysis run, review decision and
+  action item is written to it as it happens, and the next session loads it, so
+  the corpus survives a restart. An administrator can point SENTRA at a shared
+  server instead (`postgresql://user@server/sentra`, with its driver installed):
+  *Test* checks it, *Use this database* switches and carries this session
+  across. The URL's password is kept in the sealed vault, not in the settings
+  file.
+* **Data sync.** *Sync now* pushes this workstation's reports, decisions, action
+  items and audit entries, and pulls what other workstations stored. Records are
+  keyed on content - a report by its reference and narrative, a decision by the
+  report and time - so syncing twice changes nothing and two workstations
+  holding the same report store it once. Automatic sync after every run and
+  decision can be switched off.
+* **Vector database.** Each report's embedding is stored per encoder (a switch
+  from the offline encoder to the transformer keeps both sets and never mixes
+  them). *Find reports like…* returns the closest past reports to any text.
+* **Cloud backup.** One archive holds the database (as portable JSON, so a
+  SQLite backup restores into PostgreSQL), the accounts, the hash-chained audit
+  trail, the review decisions, the compliance calendar, the settings and the
+  trained model, with a SHA-256 for every file. It is **encrypted before it
+  leaves the machine** (Fernet; the key is derived from the passphrase with
+  PBKDF2-SHA256) and written to:
+  * a **folder** — a OneDrive, Google Drive or Dropbox folder (the desktop
+    client uploads it) or a network share;
+  * **S3-compatible storage** — AWS S3, MinIO, Cloudflare R2, Wasabi, Backblaze
+    B2 (requests signed with AWS Signature V4; no SDK needed);
+  * **WebDAV** — Nextcloud, ownCloud, most NAS boxes.
+
+  Back up on demand or every day / week (a backup owed while the machine was
+  off runs a minute after start), keep the newest *n*, **Verify** (download,
+  decrypt, check every checksum) or **Restore** (merge the database back -
+  nothing on this machine is deleted - and unpack the files into a dated
+  `restored/` folder to put in place by hand). Cloud keys and the passphrase are
+  sealed on the machine (DPAPI on Windows, an owner-only key file elsewhere) and
+  never shown again. **Keep the passphrase somewhere safe as well: without it a
+  backup cannot be opened.**
+* **The sync & backup log** lists every sync, backup, verify, restore and
+  connection test with its outcome, and each one is also in the Audit Log.
 
 ## Run it
 
-### Installed, on Windows
+### From source (SENTRA)
 
-Go to the **[releases page](https://github.com/tedo001/sentra/releases)** and,
-under **Assets**, **click `SENTRA-2.0.0-setup.exe`** to download it. The two
-"Source code" entries beneath it are the code, not the application. Run the
-installer and start SENTRA from the Start menu — Windows 10 or newer, 64-bit,
-and no Python needed.
+```bash
+pip install -r requirements.txt
+ollama pull gemma2:latest   # once, on the machine running Ollama (optional)
+python sentra.py            # SENTRA
+python sentra.py --present  # everything 1.5x larger - for screenshots on slides
+```
+
+On first start SENTRA asks for the administrator account. Sign in as the
+administrator to create HSE logins; sign in as an HSE Analyst to work. Load
+`samples/near_miss_reports.csv` on **Ingest** for a demo corpus of 18 reports.
+
+The first run downloads the sentence-transformer (~90 MB); the window stays
+responsive. To run with no model and no network, pick **Offline — lexical rules
+only** on Engines, or export `SIF_ENCODER=hashing`.
+
+For slides, `--present` scales the whole interface and fills the screen, so a
+screenshot stays readable when projected. `SENTRA_SCALE=1.25` suits a laptop
+screen and `SENTRA_SCALE=2` a 4K one (PowerShell:
+`$env:SENTRA_SCALE="1.25"; python sentra.py --present`).
+
+SENTRA keeps its data in the per-user folder (`%APPDATA%\SIF Insight Console`
+on Windows, `~/.config/SIF Insight Console` on Linux): accounts, the audit
+trail, review decisions, the compliance calendar, `sentra.db`, the vault and
+the preferences.
+
+### The Windows installer
+
+The **[releases page](https://github.com/tedo001/sentra/releases)** carries
+`SENTRA-2.0.0-setup.exe` (under **Assets**; the "Source code" entries are the
+code). That release packages the earlier single-window console (`app.py`), not
+yet the two-workspace SENTRA above; run SENTRA from source until the next
+release. Windows 10 or newer, 64-bit, no Python needed.
 
 | | |
 | --- | --- |
 | ![Select additional tasks](docs/install-1-tasks.png) | ![Ready to install](docs/install-2-ready.png) |
 | ![Installing](docs/install-3-installing.png) | ![Information](docs/install-4-information.png) |
 
-The build carries the sentence encoder, the learned model and the OCR engine, so
-nothing is fetched afterwards — which is why the download is large. The last
-page of the wizard names the one thing no installer can carry: the local Ollama
-model that performs translation.
-
 [INSTRUCTION.md §3A](INSTRUCTION.md) walks through it screen by screen.
 
-The installed console keeps its data in `%APPDATA%\SIF Insight Console` —
-preferences, the audit trail, the decision trail, logs, the trained model and
-the training history — never in its own installation folder, which a standard
-user cannot write to. Uninstalling leaves that folder alone.
+### The other entry points
 
-### From source
+All of them build on the same controller (`main2.MainWindow`), so every
+capability is the same code; they differ in layout and design.
 
-```bash
-pip install -r requirements.txt
-python app.py        # the console
-python app2.py       # the same console, deep-navy design
-python app3.py       # the same console, Flowbite admin design
-python app4.py       # two workspaces: HSE workspace and Administration
-python app4.py --present   # everything 1.5x larger - for screenshots on slides
-python sentra.py     # SENTRA: the revamp design, SQL + vector database, cloud backup, gemma2
-python sentra.py --present
-```
-
-**Organisation logo (app4).** Save the official Oil India Limited logo as
-`ui/assets/oil_logo.png` (`.svg`, `.webp` or `.jpg` also work) and the header
-shows it in place of the drawn OIL badge; a wide logo that already includes the
-name replaces the name text too. The file is bundled into the installer.
-
-For slides, `--present` scales the whole interface (text, tables, buttons) and
-fills the screen, so a screenshot stays readable when projected.
-`SENTRA_SCALE=1.25` suits a laptop screen and `SENTRA_SCALE=2` a 4K one
-(PowerShell: `$env:SENTRA_SCALE="1.25"; python app4.py --present`).
-
-Click **Load 5 seed incidents** for an instant demo, or **Import CSV export**
-and pick `samples/near_miss_reports.csv`. The first run downloads the
-sentence-transformer (~90 MB); the status bar reports progress and the window
-stays responsive. To run with no model and no network, pick **Offline — lexical
-rules only** on the Engines page, or export `SIF_ENCODER=hashing`.
-
-### Two entry points, one console
-
-`app.py` and `app2.py` build the *same* window from the same controller
-(`main2.py`) and differ only by a palette and a style sheet — so a fix to any
-capability lands in both, and neither can drift into being a stale copy of the
-other.
-
-| | |
+| Entry point | What it is |
 | --- | --- |
-| `app.py` | Black cards on a warm charcoal ground, lime for everything pressable, the rail in capitals. This is what the installer ships. |
-| `app2.py` | The same console in near-black navy with a teal accent, icons in the rail. |
-| `app3.py` | The same console in the Flowbite admin design: white cards, grey ground, blue accent. |
-| `app4.py` | The SENTRA HSE application design: a sign-in screen, then one of two workspaces. HSE: Home (what needs you), Ingest (staged files through OCR, extraction and analysis), Dashboard, HSE Review (engine assessment, evidence and reasoning, the human decision), Action Items, Risk Hotspots, Reports, Profile. Administration: Engines, Settings, SysLog, Audit Log (hash-chained, with previous and new values), New HSE Login, Profile. IBM Plex is bundled (SIL OFL). Safety decisions and platform control are separate roles in this build only. |
-| `sentra.py` | The revamp design (Inter and JetBrains Mono bundled, SIL OFL; the official OIL emblem) over build 4's two workspaces, plus: a **local SQL database** that keeps every report, decision, action item and audit entry across sessions (SQLite by default, any SQLAlchemy URL for a shared server); a **vector index** for similar-report search; **encrypted cloud backup** to a synced folder, S3-compatible storage or WebDAV, with verify and restore; and the local LLM `gemma2:latest` switched on from the start, with its state as a button in the title row. Administration gains a *Data & Backup* tab. |
-
-### SENTRA: data, backup and the local LLM
-
-* **Local SQL database.** `sentra.db` (SQLite) sits beside the accounts and the
-  audit trail. Every analysis run, review decision and action item is written to
-  it as it happens, and the next session loads it, so the corpus survives a
-  restart. On *Data & Backup* an administrator can point SENTRA at a shared
-  server instead (`postgresql://user@server/sentra`, with its driver
-  installed); the password is kept in the sealed vault, not in the settings
-  file. **Sync now** pushes this workstation's records and pulls what other
-  workstations stored; records are keyed on content, so syncing twice changes
-  nothing.
-* **Vector database.** Each report's embedding is stored per encoder, and
-  *Find reports like...* returns the closest past reports to any text.
-* **Cloud backup.** One archive holds the database (as portable JSON), the
-  accounts, the hash-chained audit trail, the decisions, the compliance
-  calendar, the settings and the trained model, with a SHA-256 manifest. It is
-  encrypted (Fernet, key from the passphrase by PBKDF2-SHA256) before it leaves
-  the machine, then written to a folder (OneDrive, Google Drive and Dropbox
-  folders sync it to the cloud), to S3-compatible storage (AWS S3, MinIO, R2,
-  Wasabi, B2; requests signed with AWS Signature V4), or to WebDAV (Nextcloud,
-  most NAS boxes). Back up on demand or daily/weekly, keep the newest *n*,
-  verify an archive, or restore one. A restore merges and never deletes; the
-  files are unpacked into a dated `restored/` folder to put in place by hand.
-  **Keep the passphrase somewhere safe: without it a backup cannot be opened.**
-* **gemma2:latest, always on.** SENTRA points the Ollama client at
-  `gemma2:latest` and switches the LLM analyser on at start-up. The button in
-  the title row shows green (ready), amber (checking, or the model is not
-  pulled: `ollama pull gemma2:latest`), red (host not answering; reports are
-  still analysed by the three engines) or grey (switched off by an
-  administrator). Anyone can press it to check again; only an administrator can
-  switch it off, and that choice is kept.
-
-A third skin, white and grey with a blue accent, lives in `ui/light_theme.py`
-and is one line away in `build_window()`.
+| `sentra.py` | **The application.** The revamp design (Inter and JetBrains Mono bundled, SIL OFL; the OIL emblem) over two workspaces, with the SQL and vector database, sync and backup, and gemma2:latest always on. |
+| `app4.py` | The same two workspaces in the earlier SENTRA HSE design sheet (IBM Plex), without the data features. |
+| `app.py` | The first console: one window, a sidebar, four roles. What the v2.0.0 installer ships. |
+| `app2.py`, `app3.py` | `app.py` in a deep-navy and a Flowbite admin design. |
 
 ### What is optional
 
-Everything except PyQt6 is detected at run time, and the **Engines** page says
-which of them this machine has:
-
-These are what an installed build carries by default; a source install carries
-whatever you `pip install`.
+Everything except PyQt6, NumPy, SQLAlchemy and cryptography is detected at run
+time, and the **Engines** page says which of them this machine has.
 
 | Missing | What still works |
 | --- | --- |
 | `sentence-transformers` | Everything, on the deterministic lexical engine — it ranks and enriches but never raises a flag of its own. |
 | `xgboost` / `mlflow` | Everything but the learned third opinion and the run history. |
 | `paddleocr` | Everything but scanned pages; PDFs with a text layer are still read exactly. |
-| Ollama | Everything but translation and the optional fourth opinion. A non-English report is analysed in its original wording, and that fact is recorded on the report rather than silently skipped. |
+| Ollama / gemma2 | Everything but translation and the fourth opinion. The gemma2 button turns red (or amber if the model is not pulled); a non-English report is analysed in its original wording and the report says so. |
+| `requests` | Everything but the S3 and WebDAV backup targets; folder backups still work. |
+| A database driver (`psycopg`, `pymysql`) | Everything on the local SQLite database; only a shared server needs one. |
 
-Ollama is a separate service and is not bundled by any build: install it from
-ollama.com, then `ollama pull llama3.2` (or `gemma2`), and point the Engines
-page at it.
+Ollama is a separate service and is not bundled: install it from ollama.com,
+run `ollama pull gemma2:latest`, and SENTRA finds it on `localhost:11434` (an
+administrator can point it elsewhere under *Host and model settings…*).
 
-### The pages
+### MLOps, logging and OCR
 
-| Page | What it is for |
-| --- | --- |
-| **Workflow map** | Every capability in one picture — ingest, OCR, translate, analyse, dashboard, hotspots, review, learn — each with a live status and its own control, so the path from a scanned report to a trained model is visible rather than implied. |
-| **Ingest and OCR** | Paste text, import a CSV export, or add PDFs, scans and photographs; shows which backend read each file, its OCR confidence and the extracted text, with per-document preview, analyse and remove. |
-| **Dashboard** | KPI tiles and the four exposure charts for the whole corpus. |
-| **Reports and evidence** | Every analysed report, and for the selected one: the plain-English brief, the report as filed, the extracted fields and the cues behind the verdict. |
-| **Risk hotspots** | Sites, activities, rule-at-location repeats and repeat barrier failures above the repeat threshold, ranked by SIF-precursor density. |
-| **Human review** | The queue, the case, and three keys to decide it — plus the decision trail, exportable as CSV. |
-| **Analytics** | Corpus-level charts, the learned model's summary and its feature importances. |
-| **Engines** | The encoder, the local LLM, the learned model and MLOps: what is installed, what is running, and the controls for each. |
-| **Settings** | Preferences, the live log view and the audit trail. |
-
-### Settings — system logging and MLOps
-
-* **System logging** — every component logs through `logging`; the tab shows a
-  live, level-filtered view of the ring buffer, names the rotating file under
-  `logs/`, and lets you change level or clear the buffer at runtime.
-* **MLflow** — set the tracking URI and experiment (default
-  `sqlite:///mlflow.db`, since MLflow 3 put the file store into maintenance
-  mode). Recent runs are listed with their metrics.
-* **XGBoost** — train on the analysed corpus in one click. The run logs params,
-  metrics, feature importances and the model artifact to MLflow, saves the
+* **System logging** — every component logs through `logging`; **SysLog** shows
+  it by service with a live tail, and the rotating file lives under `logs/`.
+* **MLflow** — the tracking URI and experiment (default `sqlite:///mlflow.db`).
+  Recent runs are listed with their metrics.
+* **XGBoost** — train on the reviewed labels from **Engines**. The run logs
+  params, metrics, feature importances and the model to MLflow, saves the
   booster to `models/`, and attaches it to the pipeline as a third opinion.
-* **PaddleOCR** — enable/disable OCR, pick a language, and *actually load* the
-  engine with "Download / verify OCR models" (it reports the real outcome,
-  including a failed model download, rather than guessing from the import). The
-  models are fetched **once per machine** and kept in `~/.paddlex`; the console
-  reads that directory, so a machine that already has them is told so at every
-  start-up rather than asked to check again. `python -m sif.ocr en hi ta` does
-  the download deliberately, and `--list` shows what is already there.
+* **PaddleOCR** — the models are fetched **once per machine** into
+  `~/.paddlex`; `python -m sif.ocr en hi ta` downloads them deliberately, and
+  `--list` shows what is already there. Engines says whether they are present
+  rather than claiming "Ready".
 
 ## Architecture
 
@@ -268,7 +294,9 @@ page at it.
                    ▼
             HSE Intelligence          sif/pipeline.py → Intelligence
                    ▼
-               Dashboard              main.py (PyQt6)
+               SENTRA                 sentra.py → main5.py (PyQt6)
+                   ▼
+     SQL + vector database ─► encrypted cloud backup   sif/datastore.py · sif/backup.py
 ```
 
 ### Stage by stage
@@ -285,7 +313,8 @@ page at it.
 | 6a. Pattern detection | `sif/patterns.py` | Location, activity, rule-at-location and repeat-barrier clusters (≥2 reports), ranked by **SIF-precursor density** — the share of a group's reports carrying fatal potential — discounted by a Wilson lower bound so a 2-of-2 group cannot outrank a well-evidenced one. |
 | 6b. Human review | `sif/review.py` | Queues what a person must verify: model/rule **disagreement**, **critical risk**, **thin evidence**, **high energy with no rule match**, **energy with no barrier found**, or, as a catch-all, **any other confirmed finding** — no report the engine calls SIF-potential is ever closed without a person, whatever band it scored in. Flags dismissive wording ("nothing serious") that undersells a real finding. Records the expert's decision, persists it, and hands it back as the labels training uses. |
 | 6c. Narrative generation | `sif/narrative.py` | Turns the same structured facts back into prose: a one-paragraph brief per report, or a multi-section bulletin over a corpus — headline numbers, what is driving risk, repeat exposures, language coverage, and exactly what still needs a person. Templated from verified fields, not model-generated, so every sentence traces back to a report. |
-| 7. Dashboard | `main.py` + `ui/` | Sidebar navigation, KPI tiles, painted charts, the three result tables, evidence panel and Settings. |
+| 7. Console | `main5.py` + `ui5/` over `main4.py` + `ui4/` | The two workspaces: Home, Ingest, Dashboard, HSE Review, Action Items, Risk Hotspots and Profile; Engines, Settings, SysLog, Audit Log, New HSE Login and Data & Backup. |
+| 8. Data | `sif/datastore.py`, `sif/vectorstore.py`, `sif/backup.py` | Keeps the corpus and its decisions in SQL, the embeddings in the vector index, and everything in encrypted off-site backups. |
 
 ### The learned layer (MLOps)
 
@@ -341,18 +370,31 @@ git tag -a v2.1.0 -m "..." && git push origin v2.1.0
 
 | File | Responsibility |
 | --- | --- |
+| `sentra.py` | The application's launcher: theme, sign-in, window, `--present`. |
+| `main5.py` | `SentraWindow` — the revamp pages, the SQL sync, the vector index, backup and restore, the always-on LLM and its button. |
+| `main4.py` | `WorkspaceWindow` — the two workspaces, their tabs, the two-role permission table, the compliance calendar. |
+| `ui4/` | The two-workspace pages and their wiring (`hse_wiring`, `admin_wiring`), the design kit (`kit`), the title and tab rows (`shell`), the sign-in. |
+| `ui5/` | The revamp's variants: dashboard and charts, review, action items, sign-in; the Data & Backup page; the gemma2 button; background tasks. |
+| `ui/sentra_theme.py`, `ui/workspace_theme.py` | The SENTRA style sheet (Inter, JetBrains Mono, Tailwind greys) over the two-workspace one; both keep every pop-up white. |
+| `sif/datastore.py` | The SQL database (SQLAlchemy): reports, decisions, action items, audit mirror, vectors, sync log; content-keyed push / pull; export / import for backups. |
+| `sif/vectorstore.py` | Report embeddings per encoder, cosine search. |
+| `sif/backup.py` | Encrypted archives with a SHA-256 manifest; folder, S3 (AWS SigV4) and WebDAV targets; schedule and retention. |
+| `sif/vault.py` | Secrets sealed at rest: DPAPI on Windows, an owner-only Fernet key elsewhere. |
+| `sif/accounts.py` | Accounts, roles, PBKDF2 passwords, lockout, one-time passwords, sign-in by email. |
+| `sif/actions.py` | The compliance calendar: recurring and corrective actions and who closed each date. |
+| `sif/llm.py` | The Ollama client: readiness, translation and the fourth opinion. |
 | `sif/pipeline.py` | `SIFPipeline` — orchestration, `PipelineResult`, corpus `Intelligence`. |
 | `sif/ocr.py` | `DocumentExtractor` — plain text, PDF text layer, PaddleOCR for scans; per-line OCR confidence. Also the model cache: one engine per language for the life of the process, a disk check so a downloaded model is never re-announced as pending, and `python -m sif.ocr` to fetch them once. |
 | `sif/mlops.py` | Features, `SIFModel` (XGBoost), `MLflowTracker`, `MLOpsService`. |
 | `sif/logging_setup.py` | Rotating file + in-memory ring buffer behind the Settings log view. |
 | `sif/audit.py` | The audit trail: append-only JSONL, `system` and `functionality` entries, CSV export. Separate from the log, because the log rotates away. |
 | `ui/` | `theme` (palette, style sheet, scroll-control assets), `charts` (painted bar/donut), `components`, `views`. |
-| `ui/assets/` | Scrollbar stepper arrows - Qt cannot draw a triangle reliably from a style sheet alone. |
+| `ui/assets/` | The OIL emblem, the bundled fonts with their SIL OFL licences, and the scrollbar arrows - Qt cannot draw a triangle reliably from a style sheet alone. |
 | `sif/lexical.py` | `LexicalEngine` — IOGP, energy, barrier, activity and location knowledge as patterns; the deterministic backbone. Holds the 5 seed narratives. |
 | `sif/prototypes.py` | Natural-language label descriptions for zero-shot semantic classification. |
-| `main2.py` | The controller both entry points build on: `MainWindow`, the workers, every page's wiring. |
+| `main2.py` | The controller every entry point builds on: `MainWindow`, the workers, the permission check on each action. |
 | `main.py` | The first console, kept as a single-window reference build. |
-| `app.py`, `app2.py` | Launchers — dependency check, palette, `QApplication` bootstrap, event loop. They differ by which theme module they call. |
+| `app.py` … `app4.py` | Launchers — dependency check, palette, `QApplication` bootstrap, event loop. They differ by which theme module they call. |
 | `ui/theme.py` | The shared colour table and the typographic switches a skin sets before a window is built - a Qt style sheet can change neither letter case nor an icon. |
 | `ui/green_theme.py`, `ui/gov_theme.py`, `ui/light_theme.py` | The three skins: black and lime, deep navy and teal, white and grey. Each is a palette plus a style sheet, applied either side of construction. |
 | `sif/paths.py` | Where a build may write: beside the code from a checkout, under the per-user data directory when frozen. An installed application cannot write into its own Program Files folder. |
@@ -363,7 +405,12 @@ git tag -a v2.1.0 -m "..." && git push origin v2.1.0
 | `test_sif.py` | 102 unit tests across every stage, the fusion guards, MLOps, document extraction, where a frozen build writes, and the Qt widgets. |
 | `test_app2.py` | 103 tests: language handling, the local LLM and its model names, the workflow map, the review bench, the decision log and the OCR model cache. |
 | `test_release.py` | 25 tests for versioning, the update checker and the release pipeline. |
-| `test_functional.py` | 60 end-to-end tests: both windows driven against the real `samples/` files, from import through review to a trained model, plus the skins measured off the rendered pixels. |
+| `test_functional.py` | 65 end-to-end tests: the windows driven against the real `samples/` files, from import through review to a trained model, plus the skins measured off the rendered pixels. |
+| `test_access.py` | 32 tests: sign-in, roles, lockout, one-time passwords and the audit chain. |
+| `test_app4.py` | 37 tests: the two workspaces, their tabs and permissions, every page. |
+| `test_actions.py`, `test_present.py` | 21 tests: the compliance calendar and the presentation helpers. |
+| `test_sentra.py` | 18 tests: SENTRA's pages, gemma2 always on and who may switch it off, the database written and reloaded, sync, similar-report search, backup / verify / restore, scheduled backups, the sign-in, menus measured as opaque white, and nothing leaking into app4. |
+| `test_sentra_data.py` | 18 tests: the SQL store, the vector index, the vault, the archive and its tamper checks, AWS SigV4 against the suite's own vectors, and the folder, S3 and WebDAV targets against local servers that verify each request. |
 | `sample_reports.csv` | Six mock rows for the batch-import demo. |
 | `samples/` | Test material for every ingestion path - an 18-report CSV, a shift log, a text-layer PDF, a scan with no text layer, and reports in five Indian languages. See `samples/README.md`. |
 | `reports/` | Generated analysis report (PDF). |
@@ -460,12 +507,13 @@ original is the record.
 
 ## The audit trail
 
-Settings carries two records, and they are not the same thing.
+SENTRA keeps two records, on two Administration tabs, and they are not the same
+thing.
 
-* **System logging** is diagnostics. Verbose, full of third-party chatter, and it
+* **System logging** (*SysLog*) is diagnostics. Verbose, full of third-party chatter, and it
   rotates away after a few megabytes - right for finding out why something failed
   this morning, wrong for anything else.
-* **The audit trail** (`sif/audit.py`) is append-only JSONL beside the settings
+* **The audit trail** (*Audit Log*, `sif/audit.py`) is append-only, hash-chained JSONL beside the settings
   file, one line per event, and nothing rotates it. **SYSTEM** entries are what
   the software did by itself - started, attached a model, fetched OCR models,
   checked for a release. **FUNCTIONALITY** entries are what an operator asked for
@@ -479,22 +527,27 @@ than letting anyone believe it reached disk.
 
 ## Desktop behaviour
 
-Both builds are desktop applications rather than mock-ups of one:
+Every build is a desktop application rather than a mock-up of one:
 
 * **No pictographs anywhere.** Every label is words or a typographic mark, so the
   interface renders identically on a plant workstation with no emoji font. A test
   in each suite fails if one creeps back in.
-* **Nothing decorative that does nothing.** The notification bell was a label
-  with no signal behind it; an indicator that never indicates anything teaches an
-  operator to ignore indicators, so it was removed rather than given a meaning.
+* **Nothing decorative that does nothing.** The bell counts cases waiting for a
+  person (or, in Administration, today's refused sign-ins and permissions) and
+  opens them; the gemma2 button reports what the Ollama host actually answered.
+  An indicator that never indicates anything teaches an operator to ignore
+  indicators.
+* **Pop-ups are always readable.** Menus and drop-down lists open white with dark
+  text wherever they are opened from; a test measures the rendered pop-up.
 * **The window remembers itself.** Size, position and maximised state are saved
   on close and restored on start - clamped to the screen actually attached, so a
   geometry saved on a docked 4K monitor cannot open off-screen on a laptop.
 * **Draggable columns.** Build 1's dashboard workspace is a splitter: an operator
   reading long narratives widens the middle, one entering reports widens the
   left. Neither column can be collapsed to nothing.
-* **Minimum window size** of 1024x640, below which the layout is not honest about
-  what it can show.
+* **Minimum window size** of 1366x768 for SENTRA and app4 (1024x640 for the
+  single-window builds), below which the layout is not honest about what it can
+  show.
 
 ## Scrolling
 
@@ -503,6 +556,10 @@ sits in a scroll area with a minimum content height below which the bar appears
 instead of the content shrinking; the sidebar nav scrolls on short screens; and
 all tables scroll per pixel in both directions. Verified at **1280 x 720** - a
 plant laptop, not a desk monitor - with every page reachable:
+
+In SENTRA the Dashboard, Profile and Data & Backup scroll as whole pages; the
+review list, the case and the calendar scroll in place, and the decision buttons
+stay pinned under the case. In the single-window builds:
 
 | Build 2 page | How it scrolls |
 | --- | --- |
@@ -525,7 +582,7 @@ rename cannot silently leave the arrows blank.
 
 ## Concurrency
 
-Four worker threads, no blocking work on the GUI thread:
+No blocking work on the GUI thread. The console's workers run one at a time:
 
 | Worker | Runs |
 | --- | --- |
@@ -533,6 +590,12 @@ Four worker threads, no blocking work on the GUI thread:
 | `ExtractionWorker` | PDF reading and OCR, including PaddleOCR's first-run model download. |
 | `TrainingWorker` | XGBoost training and the MLflow run. |
 | `OCRProbeWorker` | The "Check OCR availability" probe. |
+
+SENTRA's data jobs run beside them on their own threads (`ui5/tasks.py`), so an
+import never blocks a backup and a backup never refuses an import: the gemma2
+check (every two minutes, quietly unless its state changes), sync and the
+start-up load, indexing and search, database tests, backup, listing, verify and
+restore. Closing the window waits for them.
 
 Results come back over `pyqtSignal` — `row_ready(dict)`, `progress(int, int)`,
 `status(str)`, `failed(str)`, `completed(int)` — so the event loop is never
@@ -549,12 +612,14 @@ On a headless machine prefix with `QT_QPA_PLATFORM=offscreen`, and with
 `SIF_ENCODER=hashing` to pin the offline encoder so the run needs no model
 download and is deterministic.
 
-**322 tests.** They cover every pipeline stage and the fusion guards, the MLOps
+**421 tests.** They cover every pipeline stage and the fusion guards, the MLOps
 round-trip, document extraction and the OCR model cache, the local LLM's
 readiness and model-name handling, the review bench and its decision trail, the
-update checker and the release pipeline, sign-in, roles and the audit chain — and the interface itself, driven
-headless against the real `samples/` files from import through review to a
-trained model.
+update checker and the release pipeline, sign-in, roles and the audit chain, the
+two workspaces, the compliance calendar, SENTRA's database, vector index, sync,
+encrypted backup and restore against local S3 and WebDAV servers — and the
+interface itself, driven headless against the real `samples/` files from import
+through review to a trained model.
 
 Some of them measure rendered pixels rather than state, because a few classes of
 interface bug are invisible to any other kind of test: a widget painting the

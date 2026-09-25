@@ -253,6 +253,28 @@ QToolButton#LLMButton[state="off"] {{ color: {G[400]}; }}
 QToolButton#LLMButton[state="offline"] {{ border-color: rgba(239,68,68,0.55); }}
 QToolButton#LLMButton::menu-button {{ border: none; width: 16px; }}
 QToolButton#LLMButton::menu-arrow {{ width: 8px; height: 8px; }}
+/* pop-ups in the revamp's greys (the rules above keep them white everywhere) */
+QMenu, QFrame#WorkspaceHeader QMenu, QFrame#TabRow QMenu, QFrame#Card QMenu,
+QWidget#DesignPage QMenu {{
+    background-color: #FFFFFF; color: {G[900]}; border: 1px solid {G[200]};
+    border-radius: 6px; padding: 4px;
+}}
+QMenu::item, QFrame#WorkspaceHeader QMenu::item {{
+    background: transparent; color: {G[900]}; font-size: 13px; padding: 8px 28px 8px 14px;
+    border-radius: 4px;
+}}
+QMenu::item:selected, QFrame#WorkspaceHeader QMenu::item:selected {{
+    background-color: #EFF6FF; color: {NAVY};
+}}
+QMenu::item:disabled, QFrame#WorkspaceHeader QMenu::item:disabled {{ color: {G[500]}; }}
+QMenu::separator, QFrame#WorkspaceHeader QMenu::separator {{
+    height: 1px; background: {G[200]}; margin: 4px 6px;
+}}
+QComboBox QAbstractItemView, QFrame#WorkspaceHeader QComboBox QAbstractItemView {{
+    background-color: #FFFFFF; color: {G[900]}; border: 1px solid {G[200]};
+    selection-background-color: #EFF6FF; selection-color: {NAVY};
+}}
+QComboBox QAbstractItemView::item:hover {{ background-color: #EFF6FF; }}
 QLabel#GradientStatus {{
     font-family: {MONO}; font-size: 12px; color: rgba(255,255,255,0.7);
     background: rgba(255,255,255,0.10); border: 1px solid rgba(255,255,255,0.20);
