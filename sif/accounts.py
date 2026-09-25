@@ -113,6 +113,7 @@ MIN_PASSWORD = 8
 MAX_FAILURES = 5
 LOCKOUT_MINUTES = 5
 USERNAME = re.compile(r"^[a-z0-9][a-z0-9._-]{2,31}$")
+EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
 def accounts_file_path() -> str:
@@ -166,6 +167,12 @@ class Account:
     failed_attempts: int = 0
     locked_until: str = ""
     last_login: str = ""
+    #: Optional particulars, shown on the profile and the account list. An
+    #: account file written before they existed loads with them blank.
+    email: str = ""
+    employee_no: str = ""
+    site: str = ""
+    department: str = ""
 
     @property
     def role_label(self) -> str:
@@ -177,6 +184,8 @@ class Account:
                 "role": self.role, "role_label": self.role_label,
                 "active": self.active, "created_at": self.created_at,
                 "created_by": self.created_by, "last_login": self.last_login,
+                "email": self.email, "employee_no": self.employee_no,
+                "site": self.site, "department": self.department,
                 "locked": bool(self.locked_until and
                                datetime.fromisoformat(self.locked_until) > _now())}
 
@@ -267,6 +276,35 @@ class AccountStore:
     def get(self, username: str) -> Optional[Account]:
         return self._accounts.get(username.strip().lower())
 
+    def resolve(self, name: str) -> str:
+        """The username for a username or an email address; ``name`` if neither."""
+        name = name.strip().lower()
+        if name in self._accounts or "@" not in name:
+            return name
+        return next((account.username for account in self._accounts.values()
+                     if account.email and account.email.lower() == name), name)
+
+    PROFILE_FIELDS = ("email", "employee_no", "site", "department")
+
+    def set_profile(self, username: str, **values: str) -> Account:
+        """Set an account's particulars: email, employee number, site, department."""
+        account = self._require(username)
+        email = values.get("email")
+        if email is not None:
+            email = email.strip().lower()
+            if email and not EMAIL.match(email):
+                raise AuthError("That does not look like an email address.", "bad email")
+            if email and any(other.email.lower() == email and other.username != account.username
+                             for other in self._accounts.values()):
+                raise AuthError("Another account already uses that email.", "duplicate email")
+        with self._lock:
+            for name in self.PROFILE_FIELDS:
+                if name in values and values[name] is not None:
+                    value = email if name == "email" else " ".join(str(values[name]).split())
+                    setattr(account, name, value)
+            self.save()
+        return account
+
     def accounts(self) -> List[Account]:
         return sorted(self._accounts.values(), key=lambda item: item.username)
 
@@ -304,8 +342,11 @@ class AccountStore:
         return account
 
     def authenticate(self, username: str, password: str) -> Session:
-        """Sign someone in, or raise :class:`AuthError` saying why not."""
-        username = username.strip().lower()
+        """Sign someone in, or raise :class:`AuthError` saying why not.
+
+        ``username`` may also be the account's email address.
+        """
+        username = self.resolve(username)
         with self._lock:
             account = self._accounts.get(username)
             if account is None:

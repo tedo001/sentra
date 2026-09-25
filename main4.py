@@ -38,7 +38,10 @@ from sif.version import __version__
 from ui2.activity import AccountDialog, ActivityView
 from ui2.components import titled
 from ui4.calendar import ActionDetailDialog, ActionDialog, ActionsView
-from ui4.pages import HomeView, ProfileView
+from ui4.hse_wiring import HSEPages, IngestFlow
+from ui4.present import initials, stamp
+from ui4.kit import Page
+from ui4.profile import ProfilePage
 from ui4.shell import TabRow, WorkspaceHeader
 
 __all__ = ["WorkspaceSession", "WorkspaceWindow", "HSE_TABS", "ADMIN_TABS",
@@ -93,7 +96,7 @@ def workspace_session(session: Optional[Session]) -> WorkspaceSession:
                                for item in fields(Session)})
 
 
-class WorkspaceWindow(MainWindow):
+class WorkspaceWindow(IngestFlow, HSEPages, MainWindow):
     """Build 2's console behind build 4's two workspaces."""
 
     MIN_WIDTH, MIN_HEIGHT = 1366, 768
@@ -136,14 +139,28 @@ class WorkspaceWindow(MainWindow):
         layout.insertWidget(0, self.shell_header)
         layout.insertWidget(1, self.tab_row)
 
-        self.home_view = HomeView()
-        self.profile_view = ProfileView()
-        self._add_page("home", self.home_view, "Home",
-                       "What needs you now: the counts, the cases waiting for a person, "
-                       "the latest reports and your own recent work.")
-        self._add_page("profile", self.profile_view, "Profile",
-                       "Who you are signed in as, your password, your preferences and "
-                       "your own activity.")
+        # The design has neither a menu bar nor a status footer; the menu's
+        # shortcuts stay on the window so Ctrl+O and the rest still work.
+        for menu_action in self.menuBar().actions():
+            menu = menu_action.menu()
+            for action in (menu.actions() if menu is not None else ()):
+                if not action.isSeparator():
+                    self.addAction(action)
+        self.menuBar().hide()
+        self.status_label.parentWidget().hide()
+
+        self.home_page = self._build_home()
+        self._page_index["home"] = self.pages.addWidget(self.home_page)
+        self.ingest_page = self._build_ingest()
+        self._page_index["ingest"] = self.pages.addWidget(self.ingest_page)
+        self.dashboard_page = self._build_dashboard()
+        self._page_index["dashboard"] = self.pages.addWidget(self.dashboard_page)
+        self.review_page = self._build_review()
+        self._page_index["review"] = self.pages.addWidget(self.review_page)
+        self.hotspots_page = self._build_hotspots()
+        self._page_index["hotspots"] = self.pages.addWidget(self.hotspots_page)
+        self.profile_view = ProfilePage(self.workspace)
+        self._page_index["profile"] = self.pages.addWidget(self.profile_view)
 
         # Compliance Action Items: the HSE calendar of recurring and corrective work.
         self.actions = ActionStore()
@@ -154,10 +171,13 @@ class WorkspaceWindow(MainWindow):
         self.actions_view.add_requested.connect(self.add_action)
         self.actions_view.action_requested.connect(self.open_action)
         self.actions_view.samples_requested.connect(self.load_sample_actions)
-        self._add_page("actions", self.actions_view, "Compliance Action Items",
-                       "The recurring and one-off HSE work, and the corrective actions "
-                       "raised against reports. Nothing closes itself: a person marks "
-                       "each date done.")
+        actions_page = Page("Compliance Action Items",
+                            "Recurring and corrective HSE work \u00b7 a person marks each "
+                            "date done")
+        actions_page.body.addWidget(self.actions_view, 1)
+        self._page_index["actions"] = self.pages.addWidget(actions_page)
+        self.reports_page = self._build_reports()
+        self._page_index["reports"] = self.pages.addWidget(self.reports_page)
 
         # SysLog: what the software did - the log panel from Settings.
         syslog = QWidget()
@@ -195,9 +215,6 @@ class WorkspaceWindow(MainWindow):
         self.shell_header.preferences_requested.connect(self._open_preferences)
         self.shell_header.profile_requested.connect(lambda: self.navigate("profile"))
         self.shell_header.sign_out_requested.connect(self.sign_out)
-        self.home_view.review_requested.connect(lambda: self.navigate("review"))
-        self.home_view.ingest_requested.connect(lambda: self.navigate("ingest"))
-        self.home_view.report_requested.connect(self.open_report)
         self.profile_view.password_change_requested.connect(self.change_own_password)
         self.profile_view.preference_changed.connect(prefs.set_value)
         if self.workspace == "admin":
@@ -234,6 +251,16 @@ class WorkspaceWindow(MainWindow):
             return
         if key == "home":
             self._refresh_home()
+        elif key == "ingest":
+            self._refresh_ingest()
+        elif key == "dashboard":
+            self._refresh_dashboard()
+        elif key == "review":
+            self._refresh_review_page()
+        elif key == "hotspots":
+            self._refresh_hotspots()
+        elif key == "reports":
+            self._refresh_reports()
         elif key == "profile":
             self._refresh_profile()
         elif key == "syslog":
@@ -246,21 +273,30 @@ class WorkspaceWindow(MainWindow):
         self.tab_row.select("dashboard" if key == "reports" else key)
 
     def open_report(self, reference: str) -> None:
-        """Open one report with its evidence - the drill-down from Home."""
-        for index, row in enumerate(self.rows):
-            if str(row.get("reference")) == reference:
-                self.navigate("reports")
-                self.select_row(index)
-                return
+        """Open one report with its evidence - the drill-down from anywhere."""
+        self.navigate("reports")
+        if reference:
+            self.reports_page.select(reference)
 
     # -- refreshing ----------------------------------------------------------
 
     def _refresh(self, *args, **kwargs):
         result = super()._refresh(*args, **kwargs)
+        self._intelligence = result
         if getattr(self, "_shell_ready", False):
             self._refresh_shell()
-            if self.pages.currentIndex() == self._page_index.get("home"):
+            current = self.pages.currentIndex()
+            if current == self._page_index.get("home"):
                 self._refresh_home()
+            elif current == self._page_index.get("dashboard"):
+                self._refresh_dashboard()
+            elif current == self._page_index.get("review"):
+                self._refresh_review_page()
+            elif current == self._page_index.get("hotspots"):
+                self._refresh_hotspots()
+            elif current == self._page_index.get("reports"):
+                self._refresh_reports()
+            self._refresh_ingest()
         return result
 
     def _refresh_shell(self) -> None:
@@ -289,24 +325,63 @@ class WorkspaceWindow(MainWindow):
         return [row for row in self.audit.rows(limit=500)
                 if row.get("user") == self.session.username]
 
-    def _refresh_home(self) -> None:
-        self.home_view.show_state(self.rows, self.queue_rows, self.outstanding_reviews,
-                                  self._own_activity())
+    @staticmethod
+    def _long_date(value: str) -> str:
+        from datetime import datetime
+
+        try:
+            return datetime.fromisoformat(str(value)[:19]).strftime("%d %b %Y %H:%M")
+        except ValueError:
+            return str(value or "-")
 
     def _refresh_profile(self) -> None:
         account = self.accounts.get(self.session.username) if self.accounts else None
+        key = "admin" if self.workspace == "admin" else (
+            "viewer" if self.session.role == "viewer" else "hse")
+        created = "-"
+        if account is not None and account.created_at:
+            creator = self.accounts.get(account.created_by) if account.created_by else None
+            created = self._long_date(account.created_at)[:11] + (
+                f" by {creator.full_name}" if creator is not None
+                else " \u00b7 first administrator on this machine" if account.role == "admin"
+                and not account.created_by else "")
+        site = account.site if account is not None else ""
+        department = account.department if account is not None else ""
+        fields = [("Full name", self.session.full_name),
+                  ("Email", (account.email if account is not None else "") or "-"),
+                  ("Employee no.", (account.employee_no if account is not None else "") or "-"),
+                  ("Role", self.session.role_label),
+                  ("Organisation", "Oil India Limited"),
+                  ("Site", site or "-"),
+                  ("Department", department or "-")]
+        if key != "admin":
+            fields.append(("Project", "PS 26165"))
+        fields += [("Account created", created), ("Session", self.session.session_id)]
         self.profile_view.set_person({
-            "full_name": self.session.full_name,
-            "username": self.session.username,
-            "role": self.session.role_label,
-            "workspace": "Administration" if self.workspace == "admin" else "HSE workspace",
-            "signed_in": self.session.started_at.replace("T", " "),
-            "session": self.session.session_id,
-        }, can_change_password=self.session.authenticated and account is not None)
+            "full_name": self.session.full_name, "initials": initials(self.session.full_name),
+            "role": self.session.role_label, "site": site, "department": department,
+            "last": self._long_date(self.session.started_at) if self.session.authenticated
+            else "-", "workspace_key": key,
+        }, fields, can_change_password=self.session.authenticated and account is not None)
         self.profile_view.check_updates.blockSignals(True)
         self.profile_view.check_updates.setChecked(bool(prefs.get("check_updates", True)))
         self.profile_view.check_updates.blockSignals(False)
-        self.profile_view.set_activity(self._own_activity())
+        if hasattr(self.profile_view, "auto_refresh"):
+            self.profile_view.auto_refresh.blockSignals(True)
+            self.profile_view.auto_refresh.setChecked(bool(prefs.get("auto_refresh", True)))
+            self.profile_view.auto_refresh.blockSignals(False)
+        self.profile_view.set_activity([
+            {"when": stamp(row.get("at")), "action": row.get("action", ""),
+             "summary": row.get("summary", "")} for row in self._own_activity()])
+        me = self.session.username
+        self.profile_view.set_sessions([
+            {"when": stamp(row.get("at")),
+             "workstation": (row.get("detail") or {}).get("workstation") or socket.gethostname(),
+             "role": ROLE_NAMES.get(str(row.get("role")), str(row.get("role") or "")),
+             "state": "this session" if index == 0 else "ended"}
+            for index, row in enumerate(entry for entry in self.audit.rows(limit=500)
+                                        if entry.get("user") == me
+                                        and entry.get("action") == "signed in")])
 
     def _refresh_logs(self) -> None:
         if self.pages.currentIndex() == self._page_index.get("syslog"):

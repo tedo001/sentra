@@ -223,6 +223,15 @@ class TrainingWorker(QThread):
             self.failed.emit(f"{type(exc).__name__}: {exc}")
 
 
+#: Columns carried alongside a narrative when a CSV export has them - when and
+#: where it happened, and who filed it. Each maps to the first matching header.
+CSV_META_COLUMNS = {
+    "reported_on": ("date", "report_date", "incident_date", "reported_on", "date_reported"),
+    "site": ("site", "location", "installation", "facility"),
+    "reported_by": ("reported_by", "reporter", "raised_by", "submitted_by"),
+}
+
+
 def read_csv_reports(path: str) -> Tuple[List[str], List[str]]:
     """Extract narratives and references from a CSV export.
 
@@ -230,11 +239,22 @@ def read_csv_reports(path: str) -> Tuple[List[str], List[str]]:
     one, the longest text cell in each row is used, which keeps the importer
     usable with arbitrary contractor spreadsheets.
     """
+    narratives, references, _ = read_csv_records(path)
+    return narratives, references
+
+
+def read_csv_records(path: str) -> Tuple[List[str], List[str], List[Dict[str, str]]]:
+    """As :func:`read_csv_reports`, plus each row's date, site and reporter.
+
+    The third list lines up with the first two; a column the export does not
+    have is simply absent from each dictionary.
+    """
     if not os.path.isfile(path):
         raise FileNotFoundError(f"CSV file not found: {path}")
 
     narratives: List[str] = []
     references: List[str] = []
+    metadata: List[Dict[str, str]] = []
     with open(path, "r", encoding="utf-8-sig", newline="") as handle:
         sample = handle.read(4096)
         handle.seek(0)
@@ -249,6 +269,8 @@ def read_csv_reports(path: str) -> Tuple[List[str], List[str]]:
             target = next((lookup[key] for key in CSV_TEXT_COLUMNS if key in lookup), None)
             ref_key = next((lookup[key] for key in ("report_id", "id", "ref", "reference")
                             if key in lookup), None)
+            meta_keys = {field: next((lookup[key] for key in names if key in lookup), None)
+                         for field, names in CSV_META_COLUMNS.items()}
             for row in reader:
                 if target and row.get(target):
                     narratives.append(str(row[target]))
@@ -258,11 +280,15 @@ def read_csv_reports(path: str) -> Tuple[List[str], List[str]]:
                         continue
                     narratives.append(max(values, key=len))
                 references.append(str(row.get(ref_key, "")) if ref_key else "")
+                metadata.append({field: str(row.get(column) or "").strip()
+                                 for field, column in meta_keys.items()
+                                 if column and str(row.get(column) or "").strip()})
         else:
             handle.seek(0)
             narratives = [line.strip() for line in handle if line.strip()]
             references = [""] * len(narratives)
-    return narratives, references
+            metadata = [{} for _ in narratives]
+    return narratives, references, metadata
 
 
 # ---------------------------------------------------------------------------

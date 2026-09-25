@@ -270,7 +270,7 @@ class ActionsView(QWidget):
         self.scroll.setWidget(self.grid_host)
 
         board = QFrame()
-        board.setObjectName("Panel")
+        board.setObjectName("Card")
         board_layout = QVBoxLayout(board)
         board_layout.setContentsMargins(14, 12, 14, 14)
         board_layout.setSpacing(10)
@@ -279,7 +279,7 @@ class ActionsView(QWidget):
         board_layout.addWidget(self.scroll, stretch=1)
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(18, 16, 18, 16)
+        layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(board)
 
     # -- the period shown --------------------------------------------------

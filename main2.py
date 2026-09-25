@@ -48,7 +48,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from main import read_csv_reports
+from main import read_csv_records
 from sif import SEED_REPORTS, SIFPipeline
 from sif.narrative import corpus_bulletin
 from sif.llm import OllamaEngine, looks_non_latin
@@ -140,6 +140,8 @@ class AnalysisWorker(QThread):
         self._pipeline = pipeline
         self._texts = list(texts or [])
         self._references = list(references or [])
+        #: Per-report date, site and reporter from a CSV, lined up with texts.
+        self._metadata: List[Dict[str, str]] = []
         self._csv_path = csv_path
         self._translator = translator
         self._language = language
@@ -167,12 +169,15 @@ class AnalysisWorker(QThread):
 
     def run(self) -> None:  # noqa: D102 - documented on the class
         try:
-            texts, references = self._texts, self._references
+            texts, references, metadata = self._texts, self._references, self._metadata
+            source = ""
             if self._csv_path:
                 self.status.emit("Reading CSV export")
-                texts, references = read_csv_reports(self._csv_path)
+                texts, references, metadata = read_csv_records(self._csv_path)
+                source = os.path.basename(self._csv_path)
 
-            pairs = [(text.strip(), references[index] if index < len(references) else "")
+            pairs = [(text.strip(), references[index] if index < len(references) else "",
+                      metadata[index] if index < len(metadata) else {})
                      for index, text in enumerate(texts)
                      if isinstance(text, str) and text.strip()]
             if not pairs:
@@ -183,7 +188,7 @@ class AnalysisWorker(QThread):
             self.status.emit(f"Encoder ready - {self._pipeline.warm_up()}")
 
             emitted = 0
-            for index, (narrative, reference) in enumerate(pairs, start=1):
+            for index, (narrative, reference, extra) in enumerate(pairs, start=1):
                 if self.isInterruptionRequested():
                     break
                 translated, language = "", ""
@@ -203,6 +208,11 @@ class AnalysisWorker(QThread):
                 result = self._pipeline.analyze(narrative, reference, translated, language)
                 payload = result.to_dict()
                 payload["_timestamp"] = datetime.now().strftime("%H:%M:%S")
+                # When and where it happened and who filed it, as the export
+                # said - the engine's own location reading stays alongside.
+                payload.update(extra)
+                if source:
+                    payload["source"] = source
                 self.row_ready.emit(payload)
                 emitted += 1
                 self.progress.emit(index, len(pairs))
