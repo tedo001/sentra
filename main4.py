@@ -24,17 +24,20 @@ from __future__ import annotations
 
 import socket
 from dataclasses import dataclass, fields
+from datetime import date
 from typing import Dict, List, Optional, Tuple
 
 from PyQt6.QtWidgets import QMessageBox, QVBoxLayout, QWidget
 
 from main2 import APP_NAME, MainWindow, requires
 from sif import prefs
+from sif.actions import ActionStore
 from sif.accounts import (ANALYSE, CLEAR, CONFIGURE, DECIDE, MANAGE_USERS, TRAIN, VIEW,
                           AccountStore, AuthError, Session)
 from sif.version import __version__
 from ui2.activity import AccountDialog, ActivityView
 from ui2.components import titled
+from ui4.calendar import ActionDetailDialog, ActionDialog, ActionsView
 from ui4.pages import HomeView, ProfileView
 from ui4.shell import TabRow, WorkspaceHeader
 
@@ -43,7 +46,8 @@ __all__ = ["WorkspaceSession", "WorkspaceWindow", "HSE_TABS", "ADMIN_TABS",
 
 HSE_TABS: Tuple[Tuple[str, str], ...] = (
     ("home", "Home"), ("ingest", "Ingest"), ("dashboard", "Dashboard"),
-    ("review", "HSE Review"), ("hotspots", "Risk Hotspots"), ("profile", "Profile"))
+    ("review", "HSE Review"), ("actions", "Action Items"), ("hotspots", "Risk Hotspots"),
+    ("profile", "Profile"))
 ADMIN_TABS: Tuple[Tuple[str, str], ...] = (
     ("engines", "Engines"), ("settings", "Settings"), ("syslog", "SysLog"),
     ("audit", "Audit Log"), ("accounts", "New HSE Login"), ("profile", "Profile"))
@@ -141,6 +145,20 @@ class WorkspaceWindow(MainWindow):
                        "Who you are signed in as, your password, your preferences and "
                        "your own activity.")
 
+        # Compliance Action Items: the HSE calendar of recurring and corrective work.
+        self.actions = ActionStore()
+        self.actions_view = ActionsView()
+        self.actions_view.set_user(self.session.username)
+        self.actions_view.set_editable(self.session.can(ANALYSE))
+        self.actions_view.period_changed.connect(self._refresh_actions)
+        self.actions_view.add_requested.connect(self.add_action)
+        self.actions_view.action_requested.connect(self.open_action)
+        self.actions_view.samples_requested.connect(self.load_sample_actions)
+        self._add_page("actions", self.actions_view, "Compliance Action Items",
+                       "The recurring and one-off HSE work, and the corrective actions "
+                       "raised against reports. Nothing closes itself: a person marks "
+                       "each date done.")
+
         # SysLog: what the software did - the log panel from Settings.
         syslog = QWidget()
         syslog_layout = QVBoxLayout(syslog)
@@ -222,6 +240,8 @@ class WorkspaceWindow(MainWindow):
             self._refresh_logs()
         elif key in ("audit", "accounts"):
             self._refresh_activity()
+        elif key == "actions":
+            self._refresh_actions()
         # A report opened from Home is part of the corpus view.
         self.tab_row.select("dashboard" if key == "reports" else key)
 
@@ -318,6 +338,114 @@ class WorkspaceWindow(MainWindow):
         super()._apply_role()
         # An HSE Analyst trains nothing here; an administrator decides nothing.
         self.engines_view.train_button.setEnabled(self.session.can(TRAIN))
+        if hasattr(self, "actions_view"):
+            self.actions_view.set_editable(self.session.can(ANALYSE))
+
+    # -- compliance action items -------------------------------------------
+
+    def _refresh_actions(self) -> None:
+        first, last = self.actions_view.period()
+        today = date.today()
+        self.actions_view.show_occurrences(self.actions.occurrences(first, last, today),
+                                           today=today,
+                                           total_actions=len(self.actions.actions))
+
+    def _owner_choices(self) -> List[Tuple[str, str]]:
+        people = [(self.session.username, self.session.full_name)]
+        if self.accounts is not None:
+            people += [(account.username, account.full_name)
+                       for account in self.accounts.accounts()
+                       if account.active and account.role != "admin"
+                       and account.username != self.session.username]
+        return [(username, f"{name} ({username})") for username, name in people]
+
+    def _reference_choices(self) -> List[Tuple[str, str]]:
+        rows = sorted(self.rows, key=lambda row: (not row.get("sif_potential"),
+                                                 -float(row.get("risk_score") or 0)))
+        return [(str(row.get("reference")),
+                 f"{row.get('reference')} - {row.get('iogp_rule') or 'no rule'}"
+                 + ("  (SIF)" if row.get("sif_potential") else ""))
+                for row in rows if row.get("reference")]
+
+    @requires(ANALYSE)
+    def add_action(self, day: str = "", reference: str = "") -> None:
+        """Ask for a new action on ``day``; ``reference`` pre-links a report."""
+        start = date.fromisoformat(day) if day else self.actions_view.selected
+        dialog = ActionDialog(self.styleSheet(), self, day=start,
+                              owners=self._owner_choices(), owner=self.session.username,
+                              references=self._reference_choices(), reference=reference)
+        if dialog.exec() != ActionDialog.DialogCode.Accepted:
+            return
+        self.create_action(**dialog.values())
+
+    @requires(ANALYSE)
+    def create_action(self, title: str, start, recurrence: str = "once", **details):
+        try:
+            action = self.actions.add(title, start, recurrence,
+                                      created_by=self.session.username, **details)
+        except ValueError as exc:
+            self._set_status(str(exc))
+            return None
+        self.audit.functionality("compliance action added", title=action.title,
+                                 start=action.start, recurrence=action.recurrence,
+                                 owner=action.owner, reference=action.reference)
+        self._set_status(f"Action added: {action.title}")
+        self._refresh_actions()
+        return action
+
+    def open_action(self, action_id: str, day: str) -> None:
+        item = next((entry for entry in self.actions.due(day)
+                     if entry.action.id == action_id), None)
+        if item is None:
+            return
+        owner = self.accounts.get(item.action.owner) if self.accounts else None
+        dialog = ActionDetailDialog(item, self.styleSheet(), self,
+                                    editable=self.session.can(ANALYSE),
+                                    owner_label=f"{owner.full_name} ({owner.username})"
+                                    if owner else item.action.owner)
+        if dialog.exec() != ActionDetailDialog.DialogCode.Accepted:
+            return
+        if dialog.choice == "delete":
+            self.delete_action(action_id)
+        elif dialog.choice in ("done", "reopen"):
+            self.complete_action(action_id, day, dialog.choice == "done")
+
+    @requires(ANALYSE)
+    def complete_action(self, action_id: str, day: str, done: bool = True) -> bool:
+        action = self.actions.get(action_id)
+        if action is None or not self.actions.set_done(action_id, day, self.session.username,
+                                                       done):
+            return False
+        self.audit.functionality("compliance action done" if done
+                                 else "compliance action reopened",
+                                 title=action.title, date=day, reference=action.reference)
+        self._set_status(f"{action.title} - {day}: {'done' if done else 'reopened'}")
+        self._refresh_actions()
+        return True
+
+    @requires(ANALYSE)
+    def delete_action(self, action_id: str) -> bool:
+        action = self.actions.get(action_id)
+        if action is None:
+            return False
+        if not self._confirm(f"Delete \"{action.title}\"" + (" and every date it repeats on"
+                                                             if action.recurring else "")
+                             + "?\n\nWhat was already marked done stays in the Audit Log."):
+            return False
+        self.actions.remove(action_id)
+        self.audit.functionality("compliance action deleted", title=action.title,
+                                 recurrence=action.recurrence, reference=action.reference)
+        self._set_status(f"Action deleted: {action.title}")
+        self._refresh_actions()
+        return True
+
+    @requires(ANALYSE)
+    def load_sample_actions(self) -> int:
+        count = self.actions.add_samples(date.today(), created_by=self.session.username)
+        self.audit.functionality("compliance actions loaded", count=count,
+                                 source="example field schedule")
+        self._refresh_actions()
+        return count
 
     # -- the person's own account -----------------------------------------
 

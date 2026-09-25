@@ -58,6 +58,12 @@ class TestBuildFour(unittest.TestCase):
         original = audit_module.audit_file_path
         audit_module.audit_file_path = lambda: self.audit_path
         self.addCleanup(setattr, audit_module, "audit_file_path", original)
+        from sif import actions as actions_module
+
+        self.actions_path = os.path.join(folder, "actions.json")
+        original_actions = actions_module.default_action_path
+        actions_module.default_action_path = lambda: self.actions_path
+        self.addCleanup(setattr, actions_module, "default_action_path", original_actions)
 
         self.dialogs: List[str] = []
         boxes = (main2.QMessageBox.information, main2.QMessageBox.warning)
@@ -116,7 +122,8 @@ class TestBuildFour(unittest.TestCase):
         self.assertEqual(self._current(window), "home")
         self.assertEqual(window.tab_row.keys, [key for key, _ in main4.HSE_TABS])
         self.assertEqual(window.tab_row.keys,
-                         ["home", "ingest", "dashboard", "review", "hotspots", "profile"])
+                         ["home", "ingest", "dashboard", "review", "actions", "hotspots",
+                          "profile"])
         self.assertEqual(window.shell_header.tag.text(), "HSE WORKSPACE")
         self.assertEqual(window.session.role_label, "HSE Analyst")
 
@@ -230,6 +237,100 @@ class TestBuildFour(unittest.TestCase):
         self.assertIsNotNone(self.store.authenticate("a.baruah", "a new long one"))
         changed = [e for e in self._actions() if e["action"] == "password changed"]
         self.assertEqual(changed[-1]["user"], "a.baruah")
+
+    # -- compliance action items -------------------------------------------------
+
+    def test_an_hse_analyst_adds_an_action_and_closes_one_date_of_it(self) -> None:
+        from datetime import date
+
+        window = self._window("reviewer", "a.baruah")
+        window.navigate("actions")
+        self.assertEqual(self._current(window), "actions")
+        today = date.today()
+        action = window.create_action("Gas test before hot work", today, "daily",
+                                      category="Permit to work", owner="a.baruah")
+        self.assertIsNotNone(action)
+        cell = window.actions_view.cells[today]
+        self.assertEqual([chip.item.action.id for chip in cell.chips], [action.id])
+        self.assertIn("\u27f3", cell.chips[0].label.text(), "a repeating item is marked")
+
+        self.assertTrue(window.complete_action(action.id, today.isoformat()))
+        self.assertTrue(window.actions.get(action.id).is_done(today))
+        chip = window.actions_view.cells[today].chips[0]
+        self.assertEqual(chip.property("state"), "done")
+        actions = [(e["action"], e["user"]) for e in self._actions()]
+        self.assertIn(("compliance action added", "a.baruah"), actions)
+        self.assertIn(("compliance action done", "a.baruah"), actions)
+
+        self.assertTrue(window.delete_action(action.id))
+        self.assertIsNone(window.actions.get(action.id))
+        self.assertIn("compliance action deleted", [e["action"] for e in self._actions()])
+
+    def test_a_crowded_day_shows_n_more_which_opens_its_week(self) -> None:
+        from datetime import date
+
+        from ui4.calendar import MONTH_LIMIT
+
+        window = self._window("reviewer", "a.baruah")
+        window.navigate("actions")
+        today = date.today()
+        for number in range(MONTH_LIMIT + 2):
+            window.create_action(f"Check {number}", today)
+        cell = window.actions_view.cells[today]
+        self.assertEqual(len(cell.chips), MONTH_LIMIT)
+        self.assertEqual(cell.more.text(), "2 more")
+        cell.more.click()
+        self.assertEqual(window.actions_view.mode, "week")
+        self.assertEqual(len(window.actions_view.cells), 7)
+        self.assertEqual(len(window.actions_view.cells[today].chips), MONTH_LIMIT + 2)
+
+    def test_the_view_filter_narrows_the_calendar(self) -> None:
+        from datetime import date
+
+        window = self._window("reviewer", "a.baruah")
+        self._window("analyst", "r.sharma")
+        window.navigate("actions")
+        today = date.today()
+        window.create_action("Mine", today, owner="a.baruah")
+        window.create_action("Theirs", today, owner="r.sharma")
+        window.create_action("Re-test feeder", today, reference="NM-2601",
+                             category="Corrective action")
+        view = window.actions_view
+
+        def titles(key):
+            view.filter.setCurrentIndex(view.filter.findData(key))
+            return sorted(item.action.title for item in view.visible_items())
+
+        self.assertEqual(titles("all"), ["Mine", "Re-test feeder", "Theirs"])
+        self.assertEqual(titles("mine"), ["Mine"])
+        self.assertEqual(titles("corrective"), ["Re-test feeder"])
+        self.assertEqual(titles("done"), [])
+
+    def test_the_example_schedule_is_offered_only_on_an_empty_calendar(self) -> None:
+        window = self._window("reviewer", "a.baruah")
+        window.navigate("actions")
+        self.assertFalse(window.actions_view.samples_button.isHidden())
+        self.assertGreater(window.load_sample_actions(), 0)
+        self.assertTrue(window.actions_view.samples_button.isHidden())
+
+    def test_a_viewer_reads_the_calendar_but_changes_nothing(self) -> None:
+        from datetime import date
+
+        window = self._window("viewer", "v.person")
+        window.navigate("actions")
+        self.assertEqual(self._current(window), "actions")
+        self.assertFalse(window.actions_view.add_button.isEnabled())
+        self.assertIsNone(window.create_action("Anything", date.today()))
+        self.assertEqual(window.actions.actions, [])
+        refused = [e["detail"]["attempted"] for e in self._actions()
+                   if e["action"] == "permission refused"]
+        self.assertIn("create_action", refused)
+
+    def test_the_calendar_belongs_to_the_hse_workspace(self) -> None:
+        admin = self._window("admin", "d.manikandan")
+        self.assertNotIn("actions", admin.tab_row.keys)
+        admin.navigate("actions")
+        self.assertEqual(self._current(admin), "engines")
 
     # -- the entry point -------------------------------------------------------
 

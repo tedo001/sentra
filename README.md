@@ -122,7 +122,7 @@ other.
 | `app.py` | Black cards on a warm charcoal ground, lime for everything pressable, the rail in capitals. This is what the installer ships. |
 | `app2.py` | The same console in near-black navy with a teal accent, icons in the rail. |
 | `app3.py` | The same console in the Flowbite admin design: white cards, grey ground, blue accent. |
-| `app4.py` | Two workspaces behind one sign-in, tabs instead of a rail. An HSE Analyst gets Home, Ingest, Dashboard, HSE Review, Risk Hotspots and Profile; an administrator gets Engines, Settings, SysLog, Audit Log and New HSE Login. Safety decisions and platform control are separate roles in this build only. |
+| `app4.py` | Two workspaces behind one sign-in, tabs instead of a rail. An HSE Analyst gets Home, Ingest, Dashboard, HSE Review, Action Items (a month/week calendar of recurring and corrective compliance actions, each date marked done by a person), Risk Hotspots and Profile; an administrator gets Engines, Settings, SysLog, Audit Log and New HSE Login. Safety decisions and platform control are separate roles in this build only. |
 
 A third skin, white and grey with a blue accent, lives in `ui/light_theme.py`
 and is one line away in `build_window()`.

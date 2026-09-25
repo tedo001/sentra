@@ -234,7 +234,7 @@ QPushButton#Warning {{
 }}
 QPushButton#Warning:hover {{ background-color: #C62828; color: #FFFFFF; }}
 
-QLineEdit, QTextEdit, QPlainTextEdit, QComboBox {{
+QLineEdit, QTextEdit, QPlainTextEdit, QComboBox, QDateEdit {{
     background-color: #FFFFFF;
     border: 1px solid #C4C7C2;
     border-radius: 3px;
@@ -243,7 +243,7 @@ QLineEdit, QTextEdit, QPlainTextEdit, QComboBox {{
     selection-background-color: {NAVY};
     selection-color: #FFFFFF;
 }}
-QLineEdit:focus, QTextEdit:focus, QPlainTextEdit:focus, QComboBox:focus {{
+QLineEdit:focus, QTextEdit:focus, QPlainTextEdit:focus, QComboBox:focus, QDateEdit:focus {{
     border: 1px solid {NAVY};
 }}
 QComboBox QAbstractItemView {{
@@ -332,6 +332,38 @@ QToolTip {{
     padding: 5px 7px;
 }}
 QMessageBox, QDialog {{ background-color: #FFFFFF; }}
+
+/* ---- Compliance Action Items: the calendar ------------------------------ */
+QWidget#CalendarGrid {{ background: #FFFFFF; }}
+QLabel#CalendarPeriod {{ font-size: 18px; font-weight: 600; color: #1F2328; }}
+QLabel#WeekdayName {{ font-weight: 600; color: #3C4043; padding: 4px 0; }}
+QPushButton#CalendarStep {{ padding: 7px 12px; min-width: 18px; }}
+QPushButton#ModeButton:checked {{ background-color: #E6EDF4; border-color: {NAVY}; color: {NAVY}; }}
+QFrame#DayCell {{ background-color: #EDEEEA; border: 1px solid #EDEEEA; border-radius: 2px; }}
+QFrame#DayCell[outside="true"] {{ background-color: #F6F6F3; border-color: #F6F6F3; }}
+QFrame#DayCell[selected="true"] {{ background-color: #D9DBD6; border-color: #C4C7C2; }}
+QFrame#DayCell[today="true"] {{ border: 2px solid {NAVY}; }}
+QFrame#DayCell QLabel#DayNumber {{ color: #5F6368; font-size: 12px; }}
+QFrame#DayCell[today="true"] QLabel#DayNumber {{ color: {NAVY}; font-weight: 700; }}
+QFrame#DayCell QFrame#ActionChip {{
+    background-color: #FFFFFF;
+    border: 1px solid #E1E3DE;
+    border-left: 3px solid #FFFFFF;
+    border-radius: 2px;
+}}
+QFrame#DayCell QFrame#ActionChip:hover {{ border-color: {NAVY}; }}
+QFrame#DayCell QFrame#ActionChip[kind="corrective"] {{ border-left: 3px solid {NAVY}; }}
+QFrame#DayCell QFrame#ActionChip[state="overdue"] {{ border-left: 3px solid #C0392B; }}
+QFrame#DayCell QFrame#ActionChip[state="done"] {{ background-color: #F7F7F5; }}
+QFrame#ActionChip QLabel#ChipText {{ color: #1F2328; font-size: 13px; }}
+QFrame#ActionChip[state="done"] QLabel#ChipText {{ color: #8A8F95; }}
+QFrame#DayCell QPushButton#MoreLink {{
+    background: transparent;
+    border: none;
+    color: #3C4043;
+    padding: 2px 6px;
+}}
+QFrame#DayCell QPushButton#MoreLink:hover {{ color: {NAVY}; text-decoration: underline; }}
 """
 
 
