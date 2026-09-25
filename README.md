@@ -99,6 +99,11 @@ python app4.py       # two workspaces: HSE workspace and Administration
 python app4.py --present   # everything 1.5x larger - for screenshots on slides
 ```
 
+**Organisation logo (app4).** Save the official Oil India Limited logo as
+`ui/assets/oil_logo.png` (`.svg`, `.webp` or `.jpg` also work) and the header
+shows it in place of the drawn OIL badge; a wide logo that already includes the
+name replaces the name text too. The file is bundled into the installer.
+
 For slides, `--present` scales the whole interface (text, tables, buttons) and
 fills the screen, so a screenshot stays readable when projected.
 `SENTRA_SCALE=1.25` suits a laptop screen and `SENTRA_SCALE=2` a 4K one

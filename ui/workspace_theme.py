@@ -96,6 +96,11 @@ QFrame#WorkspaceHeader QLabel#OilMark {{
     font-size: 9px;
     font-weight: 600;
 }}
+QFrame#WorkspaceHeader QLabel#OilLogo {{
+    background-color: #FFFFFF;
+    border-radius: 4px;
+    padding: 2px 4px;
+}}
 QLabel#OrgName {{ font-size: 14px; font-weight: 600; color: #FFFFFF; }}
 QFrame#WorkspaceHeader QLabel#OrgPlace {{ font-size: 11px; color: #A9ADB3; }}
 QLabel#Wordmark {{

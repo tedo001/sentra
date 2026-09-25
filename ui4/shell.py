@@ -11,6 +11,7 @@ administrator.
 
 from __future__ import annotations
 
+import os
 from typing import Dict, List, Optional, Sequence, Tuple
 
 from PyQt6.QtCore import QPointF, QRectF, QSize, Qt, pyqtSignal
@@ -29,7 +30,39 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-__all__ = ["WorkspaceHeader", "TabRow", "header_icon"]
+__all__ = ["WorkspaceHeader", "TabRow", "header_icon", "find_logo", "LOGO_NAMES"]
+
+#: The organisation's logo, when its file has been placed in ui/assets. The
+#: first name found is used; with none, the header keeps the drawn OIL badge.
+LOGO_NAMES = ("oil_logo.png", "oil_logo.svg", "oil_logo.webp", "oil_logo.jpg", "oil_logo.jpeg")
+LOGO_DIRECTORY = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                              "ui", "assets")
+#: Wider than this, the file is a lockup that already spells the name out.
+LOCKUP_RATIO = 2.2
+
+
+def find_logo(directory: str = "") -> str:
+    directory = directory or LOGO_DIRECTORY
+    for name in LOGO_NAMES:
+        path = os.path.join(directory, name)
+        if os.path.isfile(path):
+            return path
+    return ""
+
+
+def logo_pixmap(path: str, height: int) -> Optional[QPixmap]:
+    """``path`` scaled to ``height`` logical pixels, sharp on a high-DPI screen."""
+    from PyQt6.QtGui import QGuiApplication
+
+    source = QPixmap(path)
+    if source.isNull():
+        return None
+    screen = QGuiApplication.primaryScreen()
+    ratio = screen.devicePixelRatio() if screen is not None else 1.0
+    scaled = source.scaledToHeight(int(round(height * ratio)),
+                                   Qt.TransformationMode.SmoothTransformation)
+    scaled.setDevicePixelRatio(ratio)
+    return scaled
 
 
 def header_icon(kind: str, colour: str = "#E6E8EB") -> QIcon:
@@ -93,12 +126,27 @@ class WorkspaceHeader(QFrame):
         self.setProperty("workspace", workspace)
         self.setFixedHeight(48 if workspace == "hse" else 51)
 
-        mark = _label("OIL", "OilMark")
-        mark.setFixedSize(30, 30)
-        mark.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.logo_path = find_logo()
+        picture = logo_pixmap(self.logo_path, 34) if self.logo_path else None
+        self.organisation = _label(organisation, "OrgName")
+        if picture is not None:
+            # On a white tile: a logo drawn for paper disappears on the dark row.
+            mark = _label("", "OilLogo")
+            mark.setPixmap(picture)
+            mark.setToolTip(organisation)
+            mark.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            mark.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+            # A lockup already carries the name; the words would say it twice.
+            self.organisation.setVisible(
+                picture.width() / max(1, picture.height()) < LOCKUP_RATIO)
+        else:
+            mark = _label("OIL", "OilMark")
+            mark.setFixedSize(30, 30)
+            mark.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.mark = mark
         org = QVBoxLayout()
         org.setSpacing(0)
-        org.addWidget(_label(organisation, "OrgName"))
+        org.addWidget(self.organisation)
         org.addWidget(_label(place, "OrgPlace"))
         left = QHBoxLayout()
         left.setSpacing(10)

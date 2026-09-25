@@ -332,6 +332,49 @@ class TestBuildFour(unittest.TestCase):
         admin.navigate("actions")
         self.assertEqual(self._current(admin), "engines")
 
+    # -- the organisation's logo ---------------------------------------------------
+
+    def _logo(self, folder: str, width: int, height: int) -> None:
+        from PyQt6.QtGui import QColor, QImage
+
+        image = QImage(width, height, QImage.Format.Format_ARGB32)
+        image.fill(QColor("#C8102E"))
+        self.assertTrue(image.save(os.path.join(folder, "oil_logo.png")))
+
+    def _header(self, folder: str):
+        from ui4 import shell
+
+        original = shell.LOGO_DIRECTORY
+        shell.LOGO_DIRECTORY = folder
+        self.addCleanup(setattr, shell, "LOGO_DIRECTORY", original)
+        return shell.WorkspaceHeader("hse", "A. Baruah", "HSE Analyst", "a.baruah")
+
+    def test_without_a_logo_file_the_header_keeps_the_drawn_badge(self) -> None:
+        folder = tempfile.mkdtemp(prefix="sif-logo-")
+        self.addCleanup(shutil.rmtree, folder, True)
+        header = self._header(folder)
+        self.assertEqual(header.mark.objectName(), "OilMark")
+        self.assertEqual(header.mark.text(), "OIL")
+        self.assertFalse(header.organisation.isHidden())
+
+    def test_a_logo_file_replaces_the_badge(self) -> None:
+        folder = tempfile.mkdtemp(prefix="sif-logo-")
+        self.addCleanup(shutil.rmtree, folder, True)
+        self._logo(folder, 200, 200)                      # an emblem: the name stays
+        header = self._header(folder)
+        self.assertEqual(header.mark.objectName(), "OilLogo")
+        self.assertFalse(header.mark.pixmap().isNull())
+        self.assertEqual(round(header.mark.pixmap().deviceIndependentSize().height()), 34)
+        self.assertFalse(header.organisation.isHidden())
+
+    def test_a_logo_with_the_name_in_it_is_not_captioned_twice(self) -> None:
+        folder = tempfile.mkdtemp(prefix="sif-logo-")
+        self.addCleanup(shutil.rmtree, folder, True)
+        self._logo(folder, 600, 150)                      # a lockup: emblem and name
+        header = self._header(folder)
+        self.assertEqual(header.mark.objectName(), "OilLogo")
+        self.assertTrue(header.organisation.isHidden())
+
     # -- the entry point -------------------------------------------------------
 
     def test_the_entry_point_signs_in_and_wears_the_workspace_design(self) -> None:
