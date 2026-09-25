@@ -702,6 +702,7 @@ class SettingsView(QWidget):
         layout.setSpacing(12)
 
         tracking = Panel("MLflow tracking")
+        self.tracking_panel = tracking
         self.tracking_uri = QLineEdit("sqlite:///mlflow.db")
         self.experiment_name = QLineEdit("sif-insight-console")
         apply_button = QPushButton("Apply")
@@ -722,6 +723,7 @@ class SettingsView(QWidget):
         tracking.body.addLayout(row)
 
         logging_panel = Panel("System logging")
+        self.logging_panel = logging_panel
         self.level_box = QComboBox()
         self.level_box.addItems(["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"])
         self.level_box.setCurrentText("INFO")
@@ -750,7 +752,8 @@ class SettingsView(QWidget):
 
         layout.addWidget(tracking)
         layout.addWidget(logging_panel, stretch=1)
-        layout.addWidget(self._build_audit_panel(), stretch=1)
+        self.audit_panel = self._build_audit_panel()
+        layout.addWidget(self.audit_panel, stretch=1)
 
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)

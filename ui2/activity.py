@@ -41,7 +41,7 @@ PEOPLE_COLUMNS = (
     ("Role", "role_label", 120),
     ("Last sign-in", "last_login", 150),
     ("Sign-ins", "sign_ins", 76),
-    ("Reports analysed", "analysed", 120),
+    ("Reports analysed", "analysed", 132),
     ("Decisions", "decisions", 86),
     ("Status", "status", 90),
 )
@@ -87,7 +87,11 @@ def tally(rows: Sequence[Dict[str, object]]) -> Dict[str, Dict[str, int]]:
 class AccountDialog(QDialog):
     """Name, username and role for a new account. The password is issued."""
 
-    def __init__(self, stylesheet: str = "", parent: Optional[QWidget] = None) -> None:
+    def __init__(self, stylesheet: str = "", parent: Optional[QWidget] = None,
+                 roles: Optional[Sequence[str]] = None,
+                 labels: Optional[Dict[str, str]] = None) -> None:
+        """``roles`` and ``labels`` narrow and rename the choice for a build
+        whose role model is simpler than the account store's."""
         super().__init__(parent)
         self.setWindowTitle("Add an account")
         if stylesheet:
@@ -97,9 +101,10 @@ class AccountDialog(QDialog):
         self.username = QLineEdit()
         self.username.setPlaceholderText("Username - e.g. r.sharma")
         self.role = QComboBox()
-        for role in ROLES:
-            self.role.addItem(ROLE_LABELS[role], role)
-        self.role.setCurrentIndex(ROLES.index("analyst"))
+        choices = list(roles or ROLES)
+        for role in choices:
+            self.role.addItem((labels or ROLE_LABELS).get(role, role), role)
+        self.role.setCurrentIndex(choices.index("analyst") if "analyst" in choices else 0)
         note = QLabel("A one-time password is issued when you press OK. The person "
                       "chooses their own the first time they sign in.")
         note.setObjectName("Faint")
@@ -157,9 +162,12 @@ class ActivityView(QWidget):
         people_buttons.addStretch(1)
 
         people = Panel("People")
-        people.add(self.people_table, stretch=1)
+        self.people_panel = people
+        # The actions sit above the list, so a long list never pushes them
+        # below the fold.
         people.body.addLayout(people_buttons)
         people.add(self.admin_note)
+        people.add(self.people_table, stretch=1)
 
         # -- activity --------------------------------------------------------
         self.filter = QComboBox()
@@ -176,6 +184,7 @@ class ActivityView(QWidget):
         filter_row.addWidget(self.filter, stretch=1)
 
         activity = Panel("Activity")
+        self.activity_panel = activity
         activity.body.addLayout(filter_row)
         activity.add(self.activity_table, stretch=1)
 
@@ -198,6 +207,7 @@ class ActivityView(QWidget):
         integrity_row.addLayout(text, stretch=1)
         integrity_row.addWidget(self.verify_button)
         integrity = Panel("Integrity of the record")
+        self.integrity_panel = integrity
         integrity.body.addLayout(integrity_row)
 
         # Scrolls rather than squeezes: on a 1366x768 plant laptop two tables

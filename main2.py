@@ -753,6 +753,11 @@ class MainWindow(QMainWindow):
                 LOGGER.warning("Accounts unavailable: %s", exc)
         return self._accounts
 
+    @staticmethod
+    def role_label_for(role: str) -> str:
+        """How this build names an account's role on screen."""
+        return ROLE_LABELS.get(role, role)
+
     def permitted(self, permission: str, action: str = "") -> bool:
         """True if the signed-in role may do this; otherwise say so and record it."""
         if self._constructing or self.session.can(permission):
@@ -784,28 +789,34 @@ class MainWindow(QMainWindow):
         self.sign_out_requested = True
         self.close()
 
-    def _refresh_activity(self) -> None:
-        """People with their tallies, the filtered trail, and the chain state."""
+    def _refresh_activity(self, view: Optional[ActivityView] = None) -> None:
+        """People with their tallies, the filtered trail, and the chain state.
+
+        ``view`` is the Activity page by default; a shell that shows the same
+        record in more than one place passes each of them in turn.
+        """
+        view = view or self.activity_view
         rows = self.audit.rows(limit=0)
         counts = tally(rows)
         people = []
         store = self.accounts
         for account in (store.accounts() if store else []):
             row = account.to_row()
+            row["role_label"] = self.role_label_for(account.role)
             row.update(counts.get(account.username,
                                   {"sign_ins": 0, "analysed": 0, "decisions": 0}))
             row["last_login"] = str(row.get("last_login") or "-").replace("T", " ")
             row["status"] = ("locked" if row.get("locked") else
                              "active" if row.get("active") else "disabled")
             people.append(row)
-        self.activity_view.set_people(people)
-        chosen = str(self.activity_view.filter.currentData() or "")
+        view.set_people(people)
+        chosen = str(view.filter.currentData() or "")
         shown = [row for row in rows if not chosen or row.get("user") == chosen]
         for row in shown:
             row["user"] = row.get("user") or "(unattended)"
-        self.activity_view.set_activity(shown[:500])
+        view.set_activity(shown[:500])
         report = self.audit.verify()
-        self.activity_view.set_chain(report.summary, report.head, report.intact)
+        view.set_chain(report.summary, report.head, report.intact)
 
     def verify_audit_trail(self) -> None:
         """Walk the chain now, and say plainly what it found."""
