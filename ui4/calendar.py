@@ -51,7 +51,7 @@ FILTERS = (("all", "All"), ("mine", "Mine"), ("open", "Open"), ("overdue", "Over
 
 #: Items a month cell shows before "N more".
 MONTH_LIMIT = 3
-MONTH_CELL_HEIGHT = 190
+MONTH_CELL_HEIGHT = 235
 WEEK_CELL_HEIGHT = 480
 HEADER_HEIGHT = 30
 
