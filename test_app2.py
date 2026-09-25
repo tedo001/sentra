@@ -672,7 +672,10 @@ class TestWorkflowAndInterface(unittest.TestCase):
         import app
         import app2
 
-        for module, theme in ((app, "green_theme"), (app2, "gov_theme")):
+        import app3
+
+        for module, theme in ((app, "green_theme"), (app2, "gov_theme"),
+                              (app3, "flowbite_theme")):
             self.assertTrue(hasattr(module, "main"))
             self.assertTrue(hasattr(module, "build_window"))
             with open(module.__file__, encoding="utf-8") as handle:
@@ -688,12 +691,13 @@ class TestWorkflowAndInterface(unittest.TestCase):
         white is not off-key but unreadable. The three skins are therefore held
         to the same set of names, and every name to being a real shared colour.
         """
-        from ui import gov_theme, green_theme, light_theme
+        from ui import flowbite_theme, gov_theme, green_theme, light_theme
         from ui.theme import C
 
         names = set(gov_theme.PALETTE)
         self.assertEqual(names, set(light_theme.PALETTE))
         self.assertEqual(names, set(green_theme.PALETTE))
+        self.assertEqual(names, set(flowbite_theme.PALETTE))
         for name in names:
             self.assertTrue(hasattr(C, name), f"{name} is not a shared colour")
 

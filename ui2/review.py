@@ -59,10 +59,10 @@ __all__ = ["ReviewView", "QUEUE_COLUMNS", "TRAIL_COLUMNS", "DECISION_BUTTONS"]
 #: holds rather than to its heading, and the reason column takes what is left.
 QUEUE_COLUMNS: Sequence[Tuple[str, str, int]] = (
     ("Trigger", "trigger", 124),
-    ("Ref", "reference", 70),
-    ("Risk", "risk_score", 56),
+    ("Ref", "reference", 80),
+    ("Risk", "risk_score", 52),
     ("Engine", "sif_potential", 60),
-    ("Status", "status", 82),
+    ("Status", "status", 76),
     ("Why a human is needed", "reason", 174),
 )
 

@@ -1331,5 +1331,109 @@ class TestBlackAndLimeBuild(unittest.TestCase):
         self.assertIn("SENTRA", window.windowTitle())
 
 
+
+@unittest.skipUnless(HAS_PYQT, "PyQt6 is not installed")
+class TestBuildThree(unittest.TestCase):
+    """app3.py: every capability of app.py, in the Flowbite admin design.
+
+    The third entry point must not be a lesser copy - the same window, the
+    same actions, the same sign-in - and building it must not disturb the
+    look of the other two when they are built afterwards in the same process.
+    """
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.app = _application()
+
+    def setUp(self) -> None:
+        from ui.theme import C, LOOK
+
+        self._palette = {name: getattr(C, name) for name in vars(C)
+                         if name.isupper() and isinstance(getattr(C, name), str)}
+        self._look = {name: getattr(LOOK, name) for name in vars(LOOK) if name.isupper()}
+
+    def tearDown(self) -> None:
+        from ui.theme import LOOK, apply_palette
+
+        apply_palette(self._palette)
+        for name, value in self._look.items():
+            setattr(LOOK, name, value)
+
+    def test_it_carries_every_capability_of_app_py(self) -> None:
+        import app
+        import app3
+
+        three = app3.build_window()
+        self.addCleanup(three.close)
+        one = app.build_window()
+        self.addCleanup(one.close)
+        self.assertIs(type(three), type(one), "the same controller, not a copy")
+        self.assertEqual(list(three._page_index), list(one._page_index),
+                         "the same pages in the same order")
+        for action in ("generate_bulletin", "export_audit", "clear_corpus", "record_decision",
+                       "train_model", "check_llm", "sign_out", "add_account",
+                       "verify_audit_trail", "confirm_clear_queue", "confirm_clear_trail"):
+            self.assertTrue(callable(getattr(three, action, None)), f"app3 lost {action}()")
+
+    def test_it_signs_in_through_the_same_loop(self) -> None:
+        import inspect
+
+        import app3
+
+        source = inspect.getsource(app3.main)
+        self.assertIn("run_signed_in", source)
+
+    def test_it_wears_the_flowbite_design(self) -> None:
+        import app3
+        from ui import flowbite_theme
+        from ui.theme import C
+
+        window = app3.build_window()
+        self.addCleanup(window.close)
+        self.assertEqual(window.styleSheet(), flowbite_theme.STYLESHEET)
+        self.assertEqual(C.APP, "#F9FAFB")                     # bg-gray-50
+        self.assertEqual(C.ACCENT, "#1d4ed8")                  # primary-700
+        self.assertEqual(window.windowTitle(), "SENTRA - build 3")
+        first = window.sidebar._buttons["workflow"]
+        self.assertEqual(first.text().strip(), "Workflow map", "sentence case, as Flowbite")
+        self.assertFalse(first.icon().isNull(), "Flowbite's sidebar carries icons")
+        self.assertEqual(window.hotspot_view.table.horizontalHeaderItem(0).text(), "TYPE")
+        for name in ("mark", "avatar", "search"):
+            self.assertTrue(getattr(window.header, name).isHidden())
+
+    def test_building_it_does_not_change_the_other_two(self) -> None:
+        import app
+        import app2
+        import app3
+        from ui import gov_theme, green_theme
+
+        app3.build_window().close()
+        lime = app.build_window()
+        self.addCleanup(lime.close)
+        self.assertEqual(lime.styleSheet(), green_theme.STYLESHEET)
+        self.assertEqual(lime.sidebar._buttons["workflow"].text().strip(), "WORKFLOW MAP")
+        self.assertTrue(lime.sidebar._buttons["workflow"].icon().isNull())
+
+        app3.build_window().close()
+        navy = app2.build_window()
+        self.addCleanup(navy.close)
+        self.assertEqual(navy.styleSheet(), gov_theme.STYLESHEET)
+        self.assertEqual(navy.hotspot_view.table.horizontalHeaderItem(0).text(), "Type")
+
+    def test_nothing_paints_the_page_grey_inside_the_white_rail(self) -> None:
+        from PyQt6.QtGui import QColor
+
+        import app3
+
+        window = app3.build_window()
+        self.addCleanup(window.close)
+        window.resize(1400, 900)
+        window.show()
+        self.app.processEvents()
+        image = window.grab().toImage()
+        grey = [y for y in range(160, 780, 10)
+                if QColor(image.pixel(225, y)).name().upper() == "#F9FAFB"]
+        self.assertLess(len(grey), 6, f"grey-50 blocks inside the rail at {grey[:5]}")
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
