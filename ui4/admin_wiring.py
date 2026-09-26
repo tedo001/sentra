@@ -177,6 +177,50 @@ class AdminPages:
         self._refresh_engines_page()
         return self._evaluation
 
+    def _runs_ready(self) -> bool:
+        """May the MLflow run history be read here and now?
+
+        Listing runs imports MLflow and opens its database - seconds on a
+        plant laptop. Done while the window is built, that time showed as
+        nothing on screen between the sign-in and the console; done on the
+        GUI thread afterwards, as a frozen window. So the first listing runs
+        on a background thread (:meth:`_load_runs_in_background`), and only
+        once MLflow is loaded are runs read directly.
+        """
+        import sys
+
+        return "mlflow" in sys.modules and not getattr(self, "_runs_thread", None)
+
+    def _load_runs_in_background(self) -> None:
+        if getattr(self, "_runs_thread", None) is not None:
+            return
+        import threading
+
+        tracker = self.mlops.tracker
+        box: Dict[str, object] = {}
+
+        def work() -> None:
+            try:
+                box["runs"] = tracker.recent_runs(10)
+            except Exception:  # noqa: BLE001 - a broken store must not stop the page
+                box["runs"] = []
+
+        self._runs_box = box
+        self._runs_thread = threading.Thread(target=work, name="mlflow-runs", daemon=True)
+        self._runs_thread.start()
+        QTimer.singleShot(200, self._runs_loaded)
+
+    def _runs_loaded(self) -> None:
+        thread = getattr(self, "_runs_thread", None)
+        if thread is None:
+            return
+        if thread.is_alive():
+            QTimer.singleShot(200, self._runs_loaded)
+            return
+        self._runs_thread = None
+        self._runs_cache = list(self._runs_box.get("runs") or [])
+        self._refresh_engines_page()
+
     def _refresh_engines_page(self) -> None:
         if not hasattr(self, "engines_page"):
             return
@@ -286,11 +330,14 @@ class AdminPages:
 
         # Experiment tracking
         tracker = self.mlops.tracker
-        runs = []
-        try:
-            runs = tracker.recent_runs(10)
-        except Exception:  # noqa: BLE001 - a broken store must not stop the page
-            runs = []
+        runs = list(getattr(self, "_runs_cache", []))
+        if self._runs_ready():
+            try:
+                runs = tracker.recent_runs(10)
+            except Exception:  # noqa: BLE001 - a broken store must not stop the page
+                runs = []
+        else:
+            self._load_runs_in_background()
         installed = tracker.installed()
         page.cards["tracking"].show_state(
             ("✓ Connected", "ok") if installed else ("Not installed", "grey"),

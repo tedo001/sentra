@@ -27,7 +27,7 @@ from datetime import datetime
 from time import monotonic
 from typing import Dict, List, Optional, Sequence
 
-from PyQt6.QtCore import Qt, QThread, QTimer, pyqtSignal
+from PyQt6.QtCore import QRectF, Qt, QThread, QTimer, pyqtSignal
 from PyQt6.QtGui import QAction
 from PyQt6.QtWidgets import (
     QApplication,
@@ -2075,6 +2075,55 @@ def create_application(argv: Optional[List[str]] = None) -> QApplication:
     return app
 
 
+def opening_splash(dialog, session=None):
+    """The sign-in as it was, with "Opening SENTRA…" across it, where it was.
+
+    Shown between the sign-in closing and the console appearing. Returns the
+    splash (call ``finish(window)`` on it), or None where there is no screen.
+    """
+    from PyQt6.QtGui import QColor, QFont, QPainter
+    from PyQt6.QtWidgets import QSplashScreen
+
+    try:
+        picture = dialog.grab()
+    except Exception:  # noqa: BLE001 - a splash is a courtesy, never a failure
+        return None
+    if picture.isNull():
+        return None
+    name = getattr(session, "full_name", "") or getattr(session, "username", "")
+    text = f"Opening SENTRA for {name}…" if name else "Opening SENTRA…"
+    painter = QPainter(picture)
+    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+    ratio = picture.devicePixelRatio() or 1.0
+    width, height = picture.width() / ratio, picture.height() / ratio
+    font = QFont(dialog.font())
+    font.setBold(True)
+    # Where the person just pressed Sign in, if the page says where that is;
+    # otherwise a band near the foot of the page.
+    anchor = dialog.opening_rect() if hasattr(dialog, "opening_rect") else None
+    if anchor is not None and not anchor.isEmpty():
+        band, radius = QRectF(anchor), 4.0
+        font.setPixelSize(13)
+    else:
+        font.setPixelSize(15)
+        painter.setFont(font)
+        band_width = min(width - 40, max(360.0, painter.fontMetrics().horizontalAdvance(text) + 56))
+        band, radius = QRectF((width - band_width) / 2, height - 96, band_width, 44), 22.0
+    painter.setFont(font)
+    painter.setPen(Qt.PenStyle.NoPen)
+    painter.setBrush(QColor(30, 58, 95, 255))
+    painter.drawRoundedRect(band, radius, radius)
+    painter.setPen(QColor("#FFFFFF"))
+    painter.drawText(band, Qt.AlignmentFlag.AlignCenter, text)
+    painter.end()
+    splash = QSplashScreen(picture)
+    splash.setObjectName("OpeningSplash")
+    splash.move(dialog.geometry().topLeft())
+    splash.show()
+    QApplication.processEvents()
+    return splash
+
+
 def run_signed_in(application: QApplication, build_window, stylesheet: str = "",
                   dialog_class=None) -> int:
     """Sign someone in, run the console for them, and repeat after a sign-out.
@@ -2102,8 +2151,22 @@ def run_signed_in(application: QApplication, build_window, stylesheet: str = "",
         dialog = LoginDialog(store, audit, stylesheet)
         if dialog.exec() != LoginDialog.DialogCode.Accepted or dialog.session is None:
             return code
-        window = build_window(dialog.session, store)
-        window.show()
+        # The sign-in stays on screen, saying what is happening, until the
+        # console is ready: building it takes a moment, and an empty screen in
+        # between reads as SENTRA having closed.
+        splash = opening_splash(dialog, dialog.session)
+        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+        window = None
+        try:
+            window = build_window(dialog.session, store)
+            window.show()
+            application.processEvents()
+        finally:
+            QApplication.restoreOverrideCursor()
+            if splash is not None and window is not None:
+                splash.finish(window)
+            elif splash is not None:
+                splash.close()
         code = application.exec()
         audit.sign_out()
         if not window.sign_out_requested:

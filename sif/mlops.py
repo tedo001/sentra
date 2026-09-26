@@ -169,6 +169,16 @@ def featurise_many(results: Sequence[PipelineResult]) -> np.ndarray:
 # ---------------------------------------------------------------------------
 
 
+
+def _importable(name: str) -> bool:
+    """Is ``name`` installed? Located with find_spec, without running its import."""
+    import importlib.util
+
+    try:
+        return importlib.util.find_spec(name) is not None
+    except (ImportError, ValueError):
+        return False
+
 @dataclass
 class TrainingReport:
     """Outcome of one training run."""
@@ -207,12 +217,14 @@ class SIFModel:
 
     @staticmethod
     def installed() -> bool:
-        """True when ``xgboost`` can be imported."""
-        try:
-            import xgboost  # noqa: F401
-        except Exception:  # noqa: BLE001
-            return False
-        return True
+        """True when ``xgboost`` is installed.
+
+        Found, not imported: importing xgboost pulls in scikit-learn and takes
+        seconds, and this is asked while the window is being built - it used to
+        hold the screen blank between the sign-in and the console. Training
+        imports it for real and says so if a broken install will not load.
+        """
+        return _importable("xgboost")
 
     @property
     def is_trained(self) -> bool:
@@ -395,11 +407,8 @@ class MLflowTracker:
 
     @staticmethod
     def installed() -> bool:
-        try:
-            import mlflow  # noqa: F401
-        except Exception:  # noqa: BLE001
-            return False
-        return True
+        """True when ``mlflow`` is installed - found, not imported (see SIFModel)."""
+        return _importable("mlflow")
 
     def status(self) -> str:
         """One line for the Settings tab."""

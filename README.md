@@ -759,7 +759,7 @@ On a headless machine prefix with `QT_QPA_PLATFORM=offscreen`, and with
 `SIF_ENCODER=hashing` to pin the offline encoder so the run needs no model
 download and is deterministic.
 
-**450 tests.** They cover every pipeline stage and the fusion guards, the MLOps
+**452 tests.** They cover every pipeline stage and the fusion guards, the MLOps
 round-trip, document extraction and the OCR model cache, the local LLM's
 readiness and model-name handling, the review bench and its decision trail, the
 update checker and the release pipeline, sign-in, roles and the audit chain, the

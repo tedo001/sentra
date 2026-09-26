@@ -644,6 +644,70 @@ class TestSentra(unittest.TestCase):
         other.show()
         self._menu_is_opaque_white(other.shell_header.menu)
 
+    def test_the_sign_in_stays_on_screen_until_the_console_is_up(self) -> None:
+        """No blank moment between pressing Sign in and the console appearing."""
+        from unittest import mock
+
+        import main2
+        import sentra
+        from ui import sentra_theme
+        from ui5.login import SentraLogin
+
+        self.store.create("mani", "durgamani s", "admin", PASSWORD)
+        seen = {}
+
+        class Login(SentraLogin):
+            def exec(self):  # noqa: A003 - signs in as a person would
+                self.resize(1440, 900)
+                self.show()
+                QApplication.processEvents()
+                self.username.setText("mani")
+                self.password.setText(PASSWORD)
+                self.sign_in()
+                return self.result()
+
+        def build(session, accounts):
+            splash = QApplication.instance().findChild(QWidget, "OpeningSplash") or next(
+                (widget for widget in QApplication.topLevelWidgets()
+                 if widget.objectName() == "OpeningSplash"), None)
+            seen["splash_visible"] = bool(splash and splash.isVisible())
+            seen["cursor"] = QApplication.overrideCursor() is not None
+            window = sentra.build_window(session, accounts, datastore=DataStore(self.db_url),
+                                         vault=Vault(self.folder), probe_llm=False)
+            self.addCleanup(window.close)
+            seen["window"] = window
+            return window
+
+        from PyQt6.QtWidgets import QApplication, QWidget
+
+        from sif.datastore import DataStore
+        from sif.vault import Vault
+
+        with mock.patch.object(main2, "AccountStore", lambda: self.store), \
+                mock.patch.object(QApplication, "exec", lambda self_=None: 0):
+            code = main2.run_signed_in(QApplication.instance(), build,
+                                       sentra_theme.STYLESHEET, dialog_class=Login)
+        self.assertEqual(code, 0)
+        self.assertTrue(seen["splash_visible"])
+        self.assertTrue(seen["cursor"])
+        self.assertTrue(seen["window"].isVisible())
+        self.assertIsNone(QApplication.overrideCursor())
+        self.assertFalse(any(widget.objectName() == "OpeningSplash" and widget.isVisible()
+                             for widget in QApplication.topLevelWidgets()))
+
+    def test_building_the_window_does_not_import_the_learning_stack(self) -> None:
+        """xgboost and MLflow are found, not imported, while the window is built."""
+        import sys
+
+        from sif.mlops import MLflowTracker, SIFModel
+
+        self.assertIsInstance(SIFModel.installed(), bool)
+        self.assertIsInstance(MLflowTracker.installed(), bool)
+        before = {name for name in ("xgboost", "mlflow") if name in sys.modules}
+        self._window("reviewer")
+        after = {name for name in ("xgboost", "mlflow") if name in sys.modules}
+        self.assertEqual(after - before, set())
+
     # -- nothing leaks ---------------------------------------------------------------------------
 
     def test_app4_keeps_its_own_look_after_sentra_ran(self) -> None:

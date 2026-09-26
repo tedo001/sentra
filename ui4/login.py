@@ -393,6 +393,15 @@ class WorkspaceLogin(LoginDialog):
         self.forgot_button.setEnabled(False)
         return True
 
+    def opening_rect(self):
+        """Where "Opening SENTRA…" is shown after signing in: over the Sign in button."""
+        from PyQt6.QtCore import QRect
+
+        button = getattr(self, "sign_in_button", None)
+        if button is None or button.isHidden():
+            return None
+        return QRect(button.mapTo(self, button.rect().topLeft()), button.size())
+
     # -- remembering the username ------------------------------------------------------
 
     def _accept(self, session) -> None:

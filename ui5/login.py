@@ -187,6 +187,8 @@ class SentraLogin(WorkspaceLogin):
         self.username.setPlaceholderText("Username or email")
         self.password.setPlaceholderText("Password")
         self.remember.setText("Remember Me")
+        # The application's display name is added by the system: "Sign in - SENTRA".
+        self.setWindowTitle("Sign in")
         self.forgot_name.setPlaceholderText("Username or email")
         for field in (self.username, self.forgot_name):
             field.setClearButtonEnabled(True)

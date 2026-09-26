@@ -428,7 +428,17 @@ class WorkspaceWindow(AdminPages, IngestFlow, HSEPages, MainWindow):
         return result
 
     def _refresh_engines(self) -> None:
-        super()._refresh_engines()
+        if self._runs_ready():
+            super()._refresh_engines()
+        else:
+            # The hidden build-2 Engines view lists MLflow runs too; not while
+            # the window is being built (see AdminPages._runs_ready).
+            tracker = self.mlops.tracker
+            tracker.recent_runs = lambda limit=10: []
+            try:
+                super()._refresh_engines()
+            finally:
+                del tracker.recent_runs
         self._refresh_engines_page()
 
     def on_probed(self, *args, **kwargs):
