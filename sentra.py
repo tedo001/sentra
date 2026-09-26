@@ -20,6 +20,7 @@ index for similar-report search, encrypted cloud backup, and the local LLM
 
 from __future__ import annotations
 
+import os
 import sys
 
 import app4
@@ -43,6 +44,30 @@ def build_window(session=None, accounts=None, **options):
     return window
 
 
+def smoke_test(application) -> int:
+    """SENTRA_SMOKE=1: build the whole window with nobody signed in, then exit.
+
+    For checking a build - a packaged SENTRA.exe especially - without a person
+    at the sign-in: every page, the SQL database, the vault and the theme load,
+    or the error says which did not.
+    """
+    import tempfile
+
+    from sif.datastore import DataStore
+    from sif.vault import Vault
+
+    folder = tempfile.mkdtemp(prefix="sentra-smoke-")
+    window = build_window(None, None, datastore=DataStore("sqlite:///" + os.path.join(
+        folder, "smoke.db").replace("\\", "/")), vault=Vault(folder), probe_llm=False,
+        load_on_start=False)
+    window.show()
+    application.processEvents()
+    pages = sorted(window._page_index)
+    window.close()
+    print(f"SENTRA smoke OK - {len(pages)} pages: {', '.join(pages)}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     """Sign in, open the workspace the account belongs to; return Qt's exit code."""
     app4._require_pyqt6()
@@ -56,6 +81,8 @@ def main(argv: list[str] | None = None) -> int:
     application = create_application(argv)
     application.setApplicationDisplayName(WINDOW_TITLE)
     sentra_theme.prepare()
+    if os.environ.get("SENTRA_SMOKE"):
+        return smoke_test(application)
     from ui5.login import SentraLogin
 
     return run_signed_in(application, build_window, sentra_theme.STYLESHEET,

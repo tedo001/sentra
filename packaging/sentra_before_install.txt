@@ -1,0 +1,20 @@
+SENTRA - SIF precursor detection for Oil India Limited (Problem Statement 26165)
+
+WHAT IS INSTALLED
+  The SENTRA console: sign-in, the HSE workspace (Home, Ingest, Dashboard,
+  HSE Review with the decision trail, Action Items, Risk Hotspots map, Asset
+  Memory, Profile) and Administration (Engines, Settings, SysLog, Audit Log,
+  New HSE Login, Data & Backup).
+
+WHERE YOUR DATA LIVES
+  Accounts, the hash-chained audit trail, review decisions, the compliance
+  calendar, the SQL database (sentra.db), sealed secrets and settings are kept
+  in %APPDATA%\SIF Insight Console - not in the program folder. Uninstalling
+  SENTRA does not delete them.
+
+  The first time SENTRA starts on this computer it asks you to create the
+  administrator account. There is no default password.
+
+FONTS
+  Inter, JetBrains Mono and IBM Plex are included under the SIL Open Font
+  Licence 1.1; the licence texts are in ui\assets\fonts in the program folder.

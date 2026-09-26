@@ -55,11 +55,11 @@ barrier controls, the latest reports and the weekly risk trend.*
 | ![Home](docs/sentra-home.png) | ![Ingest](docs/sentra-ingest.png) |
 | **Home** — what needs you now: critical cases oldest first, open cases by trigger, recent incidents and your recent activity. | **Ingest** — CSV exports, PDFs, scans and photographs, or a pasted narrative, through OCR, extraction, translation and analysis, with a log per document. |
 | ![Dashboard](docs/sentra-dashboard.png) | ![HSE Review](docs/sentra-review.png) |
-| **Dashboard** — last 30 / 90 days or 12 months, by site and activity: SIF exposure by rule, failed barriers, recent reports and the weekly trend (line or bar). | **HSE Review** — the case list beside the case: engine assessment (not a decision), the report in English, evidence and reasoning, and three keys to decide it. |
+| **Dashboard** — last 30 / 90 days or 12 months, by site and activity: SIF exposure by rule, failed barriers, recent reports and the weekly trend (line or bar). | **HSE Review** — the case list beside the case: the work-hold recommendation, engine assessment (not a decision), the report in English, the asset's memory, the report's decision history, evidence and reasoning, and three keys to decide it. **Decision trail** switches to every decision recorded, standing or superseded, filterable by reviewer and decision, exportable. |
 | ![Action Items](docs/sentra-actions.png) | ![Risk Hotspots](docs/sentra-hotspots.png) |
-| **Action Items** — the compliance calendar: recurring and corrective HSE work by category, month or week, with what is due next. | **Risk Hotspots** — repeats ranked by SIF-precursor density (Wilson lower bound), not by report count, with each site's incidents, activities and barrier failures. |
-| ![Asset Memory](docs/sentra-assets.png) | |
-| **Asset Memory** — every asset, worst first: its reports by kind, what its history says, its hazards and control failures, its reports with their recommendations, and its corrective actions. | |
+| **Action Items** — the compliance calendar: recurring and corrective HSE work by category, month or week, with what is due next. | **Risk Hotspots** — an interactive map of the Upper Assam operating area: each site at its locality, sized by reports and coloured by SIF-precursor density (Wilson lower bound); hover for figures, click to choose, scroll to zoom, drag to pan. Beside it the ranked table; below, the chosen site's incidents, activities and barrier failures. |
+| ![Asset Memory](docs/sentra-assets.png) | ![Decision trail](docs/sentra-trail.png) |
+| **Asset Memory** — every asset, worst first: its reports by kind, what its history says, its hazards and control failures, its reports with their recommendations, and its corrective actions. | **Decision trail** — every review decision, when (with the zone), by whom, what the engine said, whether it overturned it, and whether it still stands. |
 
 **Profile** holds the person's details, password change, preferences, their own
 activity and their sign-in history.
@@ -148,6 +148,25 @@ A recommendation is advice to a person, never an order:
   review. If the report says the work was already stopped, the advice is to
   keep it stopped until the controls are restored.
 * Recommendations are written to the SQL database (`work_holds`).
+
+## Everyday details
+
+* **Clear and Cancel.** Every text field has a clear (×) button. Filters have
+  *Clear filters* (Dashboard, HSE Review, Asset Memory, Action Items, Risk
+  Hotspots, Audit Log, SysLog); forms have *Clear* (the pasted narrative, the
+  password change, *Clear form* on New HSE Login) or *Cancel changes* (the
+  backup settings). Ingest has **Cancel processing** while a document is being
+  read or analysed - what was already analysed is kept - and *Clear list*. The
+  first-sign-in password change can be cancelled; every dialog has Cancel.
+* **Dates and times, one way.** Everything follows the date format and time
+  zone chosen in *Settings* (Asia/Kolkata by default) and names the zone:
+  `25 Sep 2026, 14:06 IST`. A report's own date is a calendar date and is never
+  shifted. The dashboard says when it was updated, the recent reports say when
+  each was reported, the weekly trend names its weeks with the year, and a
+  review case says when the report was made and when it was analysed.
+* **No score of 100.** The risk score is capped at 95 and P(SIF) at 0.95: a
+  machine reading of free text is never certain. The critical band starts at
+  85, so no report's band, queue place or recommendation changes.
 
 ## The title row
 
@@ -293,13 +312,29 @@ on Windows, `~/.config/SIF Insight Console` on Linux): accounts, the audit
 trail, review decisions, the compliance calendar, `sentra.db`, the vault and
 the preferences.
 
-### The Windows installer
+### Build the Windows installer yourself (SENTRA.exe + setup wizard)
+
+On Windows, in a PyCharm terminal (PowerShell) opened in the project folder:
+
+```powershell
+winget install JRSoftware.InnoSetup      # once
+.\packaging\build_sentra.bat             # or: .\packaging\build_sentra.bat slim
+```
+
+That builds `dist\SENTRA\SENTRA.exe`, checks it starts, and makes
+`dist\installer\SENTRA-<version>-setup.exe` - a setup wizard with install
+folder, Start-menu and desktop shortcuts, and a last page on installing Ollama
+and `gemma2:latest`. Details in [packaging/INNO_SETUP.md](packaging/INNO_SETUP.md).
+`SENTRA_SMOKE=1` makes any build open every page without a sign-in and exit 0,
+to check it.
+
+### The published installer
 
 The **[releases page](https://github.com/tedo001/sentra/releases)** carries
 `SENTRA-2.0.0-setup.exe` (under **Assets**; the "Source code" entries are the
-code). That release packages the earlier single-window console (`app.py`), not
-yet the two-workspace SENTRA above; run SENTRA from source until the next
-release. Windows 10 or newer, 64-bit, no Python needed.
+code). That release packages the earlier single-window console (`app.py`); the
+two-workspace SENTRA is built with the commands above. Windows 10 or newer,
+64-bit, no Python needed.
 
 | | |
 | --- | --- |
@@ -481,11 +516,12 @@ git tag -a v2.1.0 -m "..." && git push origin v2.1.0
 | `main5.py` | `SentraWindow` — the revamp pages, the SQL sync, the vector index, backup and restore, the always-on LLM and its button. |
 | `main4.py` | `WorkspaceWindow` — the two workspaces, their tabs, the two-role permission table, the compliance calendar. |
 | `ui4/` | The two-workspace pages and their wiring (`hse_wiring`, `admin_wiring`), the design kit (`kit`), the title and tab rows (`shell`), the sign-in. |
-| `ui5/` | The revamp's variants: dashboard and charts, review, action items, sign-in; the Asset Memory page and the recommendation and memory panels; the Data & Backup page; the gemma2 button; background tasks. |
+| `ui5/` | The revamp's variants: dashboard and charts, review with the decision trail (`trail`), risk hotspots with the map (`hotspots`, `geomap`), action items, sign-in; the Asset Memory page and the recommendation and memory panels; the Data & Backup page; the gemma2 button; background tasks. |
 | `ui/sentra_theme.py`, `ui/workspace_theme.py` | The SENTRA style sheet (Inter, JetBrains Mono, Tailwind greys) over the two-workspace one; both keep every pop-up white. |
 | `sif/datastore.py` | The SQL database (SQLAlchemy): reports, decisions, action items, audit mirror, vectors, sync log; content-keyed push / pull; export / import for backups. |
 | `sif/vectorstore.py` | Report embeddings per encoder, cosine search. |
 | `sif/assets.py` | Asset Safety Memory: each asset's history and the signals it raises about a report. |
+| `sif/geo.py` | The operating-area gazetteer: localities, towns, rivers and roads, and where each site goes on the map. |
 | `sif/workhold.py` | Work-Hold Recommendation: Continue / HSE Review Required / Work-Hold Recommended, with weighted, explained factors. |
 | `sif/backup.py` | Encrypted archives with a SHA-256 manifest; folder, S3 (AWS SigV4) and WebDAV targets; schedule and retention. |
 | `sif/vault.py` | Secrets sealed at rest: DPAPI on Windows, an owner-only Fernet key elsewhere. |
@@ -510,6 +546,7 @@ git tag -a v2.1.0 -m "..." && git push origin v2.1.0
 | `train_model.py` | Command-line trainer: analyse a CSV, train on reviewed labels, log the run to MLflow. |
 | `sif/updater.py` | Checks GitHub Releases, verifies the download's checksum, launches the installer. |
 | `sif/version.py` | The one place the version lives; CI stamps it from the git tag. |
+| `packaging/sentra.spec`, `sentra_installer.iss`, `build_sentra.bat` | SENTRA.exe and its setup wizard, built and checked in one command. |
 | `packaging/`, `.github/workflows/release.yml` | PyInstaller spec, Inno Setup script, the step-by-step build guide, tag-driven release pipeline. |
 | `test_sif.py` | 102 unit tests across every stage, the fusion guards, MLOps, document extraction, where a frozen build writes, and the Qt widgets. |
 | `test_app2.py` | 103 tests: language handling, the local LLM and its model names, the workflow map, the review bench, the decision log and the OCR model cache. |
@@ -518,8 +555,8 @@ git tag -a v2.1.0 -m "..." && git push origin v2.1.0
 | `test_access.py` | 32 tests: sign-in, roles, lockout, one-time passwords and the audit chain. |
 | `test_app4.py` | 37 tests: the two workspaces, their tabs and permissions, every page. |
 | `test_actions.py`, `test_present.py` | 21 tests: the compliance calendar and the presentation helpers. |
-| `test_asset_memory.py` | 15 tests: assets and report kinds, every memory signal, the time window, corrective actions that did not hold, and every recommendation rule including a reviewer's decision. |
-| `test_sentra.py` | 25 tests: the Asset Memory tab, holds leading Home and HSE Review and audited once, the case panels, a rejection releasing a hold, the memory and holds in the database; SENTRA's pages, gemma2 always on and who may switch it off, the database written and reloaded, sync, similar-report search, backup / verify / restore, scheduled backups, the sign-in's alignment, forgot password end to end, menus measured as opaque white, and nothing leaking into app4. |
+| `test_asset_memory.py` | 16 tests: the map's gazetteer, assets and report kinds, every memory signal, the time window, corrective actions that did not hold, and every recommendation rule including a reviewer's decision. |
+| `test_sentra.py` | 30 tests: no score of 100, the map placing sites and a click choosing one, the decision trail, clear and cancel (including cancelling a running analysis), dates with their zone, the Asset Memory tab, holds leading Home and HSE Review and audited once, the case panels, a rejection releasing a hold, the memory and holds in the database; SENTRA's pages, gemma2 always on and who may switch it off, the database written and reloaded, sync, similar-report search, backup / verify / restore, scheduled backups, the sign-in's alignment, forgot password end to end, menus measured as opaque white, and nothing leaking into app4. |
 | `test_sentra_data.py` | 18 tests: the SQL store, the vector index, the vault, the archive and its tamper checks, AWS SigV4 against the suite's own vectors, and the folder, S3 and WebDAV targets against local servers that verify each request. |
 | `sample_reports.csv` | Six mock rows for the batch-import demo. |
 | `samples/` | Test material for every ingestion path - an 18-report CSV, a shift log, a text-layer PDF, a scan with no text layer, and reports in five Indian languages. See `samples/README.md`. |
@@ -722,7 +759,7 @@ On a headless machine prefix with `QT_QPA_PLATFORM=offscreen`, and with
 `SIF_ENCODER=hashing` to pin the offline encoder so the run needs no model
 download and is deterministic.
 
-**443 tests.** They cover every pipeline stage and the fusion guards, the MLOps
+**450 tests.** They cover every pipeline stage and the fusion guards, the MLOps
 round-trip, document extraction and the OCR model cache, the local LLM's
 readiness and model-name handling, the review bench and its decision trail, the
 update checker and the release pipeline, sign-in, roles and the audit chain, the

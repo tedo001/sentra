@@ -1,0 +1,27 @@
+SENTRA is installed.
+
+WHAT WORKS IMMEDIATELY
+  Sign in (the first start creates the administrator), ingest reports, analyse
+  them, read the dashboard, the risk map and each asset's safety memory, work
+  the HSE Review queue with its work-hold recommendations and decision trail,
+  and keep everything in the local SQL database with encrypted backups.
+
+ONE MORE INSTALL FOR THE LOCAL LLM: gemma2:latest
+  SENTRA switches the local LLM on from the start. It runs on Ollama, a
+  separate program with its own model files, so no installer can carry it.
+
+    1. Install Ollama from https://ollama.com/download
+    2. Open a Command Prompt and run:
+
+           ollama pull gemma2:latest
+
+    3. Leave Ollama running and start SENTRA. The gemma2:latest button in the
+       title row turns green when it answers. Press it to check again.
+
+  Without Ollama, SENTRA still analyses every report with its three engines;
+  the button shows red and non-English reports are analysed as written.
+
+IF ANYTHING GOES WRONG
+  Logs:        %APPDATA%\SIF Insight Console\logs
+  Your data:   %APPDATA%\SIF Insight Console
+  Bigger text for slides: Start menu > SENTRA (presentation size)

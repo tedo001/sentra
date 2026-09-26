@@ -1,5 +1,34 @@
 # Building SENTRA into a Windows installer (.exe)
 
+## SENTRA (sentra.py) - the short way
+
+From a PyCharm terminal (PowerShell) in the project folder, on Windows:
+
+```powershell
+winget install JRSoftware.InnoSetup        # once: the setup-wizard compiler
+.\packaging\build_sentra.bat               # full build (every analyser bundled)
+# or
+.\packaging\build_sentra.bat slim          # small build (~250 MB)
+```
+
+It creates `.venv`, installs the requirements and PyInstaller, builds
+`dist\SENTRA\SENTRA.exe`, **starts it once to check every page loads**, then
+compiles `dist\installer\SENTRA-<version>-setup.exe`. The setup wizard runs:
+Welcome, what is installed and where data lives, install folder, Start-menu
+folder, desktop shortcut, install, what to do next (Ollama and
+`ollama pull gemma2:latest`), Finish with "Start SENTRA" ticked.
+
+Files: `sentra.spec` (PyInstaller), `sentra_installer.iss` (Inno Setup),
+`sentra_before_install.txt` / `sentra_after_install.txt` (wizard pages),
+`build_sentra.bat` (all of it), `../ui/assets/sentra.ico` (the icon).
+
+The rest of this file is the step-by-step guide for the single-window console
+(`app.py`, `sif_console.spec`, `installer.iss`) that the v2.0.0 release ships;
+every step applies to SENTRA too with those three names swapped.
+
+---
+
+
 Step by step, from a clean Windows machine to `SENTRA-2.0.0-setup.exe`.
 
 **What Inno Setup does and does not do.** It builds an installer out of files
