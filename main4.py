@@ -43,7 +43,7 @@ from ui2.components import titled
 from ui4.calendar import ActionDetailDialog, ActionDialog, ActionsView
 from ui4.admin_wiring import AdminPages
 from ui4.hse_wiring import HSEPages, IngestFlow
-from ui4.present import initials, stamp
+from ui4.present import fmt_date, fmt_datetime, initials, stamp
 from ui4.kit import Page
 from ui4.profile import ProfilePage
 from ui4.shell import TabRow, WorkspaceHeader
@@ -319,7 +319,8 @@ class WorkspaceWindow(AdminPages, IngestFlow, HSEPages, MainWindow):
             runs = [row for row in self.audit.rows(limit=200)
                     if row.get("action") == "reports analysed"]
             self.tab_row.set_note(
-                f"Last analysis run {runs[0]['at'][11:16]}" if runs else "No analysis run yet")
+                f"Last analysis run {fmt_datetime(runs[0]['at'])}" if runs
+                else "No analysis run yet")
         else:
             today = self._today()
             alarms = [row for row in self.audit.rows(limit=500)
@@ -347,7 +348,7 @@ class WorkspaceWindow(AdminPages, IngestFlow, HSEPages, MainWindow):
         from datetime import datetime
 
         try:
-            return datetime.fromisoformat(str(value)[:19]).strftime("%d %b %Y %H:%M")
+            return fmt_datetime(datetime.fromisoformat(str(value)[:19]))
         except ValueError:
             return str(value or "-")
 
@@ -358,7 +359,7 @@ class WorkspaceWindow(AdminPages, IngestFlow, HSEPages, MainWindow):
         created = "-"
         if account is not None and account.created_at:
             creator = self.accounts.get(account.created_by) if account.created_by else None
-            created = self._long_date(account.created_at)[:11] + (
+            created = fmt_date(account.created_at) + (
                 f" by {creator.full_name}" if creator is not None
                 else " \u00b7 first administrator on this machine" if account.role == "admin"
                 and not account.created_by else "")

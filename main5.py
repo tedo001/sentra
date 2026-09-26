@@ -51,15 +51,17 @@ from sif.workhold import HOLD, Recommendation, recommend
 from sif.datastore import DataStore, default_url, describe_url
 from sif.llm import DEFAULT_HOST, OllamaEngine
 from sif.review import ReviewDecision, fingerprint
+from sif.scoring import MAX_SCORE, cap_probability
 from sif.vault import Vault
 from sif.vectorstore import VectorStore
 from ui4.admin_wiring import setting
-from ui4.present import stamp, weekly_table
+from ui4.present import fmt_datetime, in_zone, stamp, weekly_table, zone
 from ui5.actions import SentraActions
 from ui5.assets import KIND_LABEL, LEVEL_TONE, AssetMemoryPage
 from ui5.dashboard import VIOLET, SentraDashboard
 from ui5.data import DataPage
 from ui5.llm import LLMButton
+from ui5.hotspots import SentraHotspots
 from ui5.review import SentraReview
 from ui5.tasks import Task
 
@@ -89,9 +91,10 @@ def short_time(value: object) -> str:
         when = datetime.fromisoformat(str(value)[:19])
     except ValueError:
         return str(value or "-")
+    local = in_zone(when)
     if when.date() == datetime.now().date():
-        return when.strftime("%H:%M")
-    return when.strftime("%d %b %H:%M").lstrip("0")
+        return local.strftime("%H:%M ") + zone()[1]
+    return local.strftime("%d %b %H:%M ").lstrip("0") + zone()[1]
 
 
 def row_fingerprint(row: Dict[str, object]) -> str:
@@ -132,6 +135,7 @@ class SentraWindow(WorkspaceWindow):
     actions_view_class = SentraActions
     dashboard_page_class = SentraDashboard
     review_page_class = SentraReview
+    hotspots_page_class = SentraHotspots
 
     def __init__(self, session: Optional[Session] = None,
                  accounts: Optional[AccountStore] = None, *,
@@ -198,6 +202,7 @@ class SentraWindow(WorkspaceWindow):
             page.head.add(widget)
         self.hotspots_page.barrier_bars.tone = VIOLET
 
+        self._clear_buttons()
         if self.workspace == "admin":
             self.data_page = self._build_data_page()
             self._page_index["data"] = self.pages.addWidget(self.data_page)
@@ -209,6 +214,16 @@ class SentraWindow(WorkspaceWindow):
             lambda reference: self.add_action(reference=reference))
         review.memory.asset_requested.connect(self.open_asset)
         review.memory.report_requested.connect(self.open_case)
+        review.trail.reference_requested.connect(self._trail_open)
+        self._clear_buttons()
+
+    def _clear_buttons(self) -> None:
+        """A clear (×) button in every text field a person types in - not passwords."""
+        from PyQt6.QtWidgets import QLineEdit
+
+        for field in self.findChildren(QLineEdit):
+            if field.echoMode() == QLineEdit.EchoMode.Normal and not field.isReadOnly():
+                field.setClearButtonEnabled(True)
 
     def _apply_identity(self) -> None:
         super()._apply_identity()
@@ -231,6 +246,7 @@ class SentraWindow(WorkspaceWindow):
         label = {"30": "last 30 days", "90": "last 90 days", "365": "last 12 months"}[period]
         self.dashboard_page.set_weekly(weekly_table(getattr(self, "_dashboard_rows", []),
                                                     weeks=weeks), label)
+        self.dashboard_page.set_updated(f"Updated {fmt_datetime(datetime.now())}")
 
     # -- background jobs --------------------------------------------------------------
 
@@ -454,8 +470,19 @@ class SentraWindow(WorkspaceWindow):
         cases.sort(key=lambda case: 0 if "hold" in case["_in"] else 1)
         return cases
 
+    def _trail_open(self, reference: str) -> None:
+        self.review_page.show_mode("cases")
+        self.open_case(reference)
+
+    def _refresh_decision_trail(self) -> None:
+        from ui5.trail import trail_rows
+
+        self.review_page.trail.set_rows(trail_rows(
+            [entry.to_dict() for entry in self.decisions.entries]))
+
     def _refresh_review_page(self) -> None:
         super()._refresh_review_page()
+        self._refresh_decision_trail()
         page = self.review_page
         page.set_counts({key: sum(1 for case in page.rows if key in case.get("_in", ()))
                          for key, _label in page.filters})
@@ -469,6 +496,11 @@ class SentraWindow(WorkspaceWindow):
         memory = self.memory()
         context = memory.context(reference) if reference else None
         page.memory.show_context(context, memory.get(context.asset) if context else None)
+        _index, row = self._row_for(reference) if reference else (-1, None)
+        if row is not None:
+            key = row_fingerprint(row)
+            page.history.set_entries([entry.to_dict() for entry in self.decisions.entries
+                                      if entry.fingerprint == key])
 
     def _attention(self, critical, by_ref, now):
         items = super()._attention(critical, by_ref, now)
@@ -661,6 +693,9 @@ class SentraWindow(WorkspaceWindow):
         added = {"reports": 0, "decisions": 0, "actions": 0}
         index = self._narrative_index()
         for _fp, row in pulled.get("reports", []):
+            # Stored by an earlier version, a score may read 100; none may now.
+            row["risk_score"] = min(float(row.get("risk_score") or 0.0), MAX_SCORE)
+            row["p_sif"] = cap_probability(float(row.get("p_sif") or 0.0))
             key = self._narrative_key(row.get("raw_text", ""))
             if key in index:
                 continue
@@ -1118,7 +1153,14 @@ class SentraWindow(WorkspaceWindow):
         page.list_requested.connect(self.list_backups)
         page.verify_requested.connect(self.verify_backup)
         page.restore_requested.connect(self.restore_backup)
+        page.revert_requested.connect(self._revert_backup_form)
         return page
+
+    def _revert_backup_form(self) -> None:
+        self.data_page.set_target(self._backup_config(),
+                                  {name: self.vault.has(name) for name in BACKUP_SECRETS},
+                                  self._describe_target())
+        self.data_page.set_target_note("Changes cancelled - the saved settings are shown.", True)
 
     def open_report(self, reference: str) -> None:
         if self.workspace == "admin":

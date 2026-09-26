@@ -240,7 +240,9 @@ class TestScoring(unittest.TestCase):
                        "Energy isolation / LOTO not applied or verified", 1.0,
                        True, True, True, True), 1.0)
         self.assertEqual(critical.band, "Critical")
-        self.assertAlmostEqual(critical.value, 100.0, places=1)
+        # Never "100": a machine reading of free text is never certain.
+        self.assertAlmostEqual(critical.value, 95.0, places=1)
+        self.assertLessEqual(critical.drivers["p_sif"], 0.95)
 
         none = scorer.score(
             SIFVerdict(False, 0.0, "No high-energy source identified", 0.0,

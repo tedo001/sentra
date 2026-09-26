@@ -10,7 +10,12 @@ The classifier answers *whether* a report is a precursor; a queue of a thousand
 * how close to the last line of defence the failed barrier sits.
 
 The result is ordinal, not actuarial: it ranks a queue, it does not predict a
-probability of death.
+probability of death. For the same reason it never reads 100, and P(SIF) never
+reads 1.00: a free-text report read by a machine is never certain, so the
+score is capped at :data:`MAX_SCORE` (95) and the probability at
+:data:`MAX_PROBABILITY` (0.95). The critical band starts at 85, so the cap
+changes no report's band, queue or recommendation - only the claim of
+certainty.
 """
 
 from __future__ import annotations
@@ -20,7 +25,17 @@ from typing import Dict
 
 from .heads import SIFVerdict
 
-__all__ = ["RiskScore", "RiskScorer", "ENERGY_SEVERITY", "BARRIER_CRITICALITY"]
+__all__ = ["RiskScore", "RiskScorer", "ENERGY_SEVERITY", "BARRIER_CRITICALITY", "MAX_SCORE",
+           "MAX_PROBABILITY", "cap_probability"]
+
+#: The highest risk score a report can have: below 96, never "100%".
+MAX_SCORE = 95.0
+#: The highest P(SIF) a report can have.
+MAX_PROBABILITY = 0.95
+
+
+def cap_probability(value: float) -> float:
+    return round(max(0.0, min(float(value), MAX_PROBABILITY)), 3)
 
 #: How lethal an uncontrolled release of each energy typically is.
 ENERGY_SEVERITY: Dict[str, float] = {
@@ -79,20 +94,21 @@ class RiskScorer:
         # A thin narrative should rank below an identical, well-evidenced one.
         evidence_factor = 0.85 + 0.15 * max(0.0, min(extraction_confidence, 1.0))
 
-        value = 100.0 * verdict.probability * energy_weight * barrier_weight * evidence_factor
-        value = round(max(0.0, min(value, 100.0)), 1)
+        probability = cap_probability(verdict.probability)
+        value = 100.0 * probability * energy_weight * barrier_weight * evidence_factor
+        value = round(max(0.0, min(value, MAX_SCORE)), 1)
         band = next(name for floor, name in self.BANDS if value >= floor)
 
         return RiskScore(
             value=value,
             band=band,
             drivers={
-                "p_sif": verdict.probability,
+                "p_sif": probability,
                 "energy_severity": round(energy_weight, 2),
                 "barrier_criticality": round(barrier_weight, 2),
                 "evidence_factor": round(evidence_factor, 2),
             },
-            rationale=(f"P(SIF) {verdict.probability:.2f} x energy {energy_weight:.2f} "
+            rationale=(f"P(SIF) {probability:.2f} x energy {energy_weight:.2f} "
                        f"x barrier {barrier_weight:.2f} x evidence {evidence_factor:.2f}"),
         )
 

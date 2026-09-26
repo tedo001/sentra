@@ -158,9 +158,12 @@ class TrendChart(QWidget):
         self.setMouseTracking(True)
 
     def set_data(self, weeks: Sequence[str], sif: Sequence[float], critical: Sequence[float],
-                 reports: Sequence[float], reference: Optional[Tuple[float, str]] = None) -> None:
+                 reports: Sequence[float], reference: Optional[Tuple[float, str]] = None,
+                 titles: Sequence[str] = ()) -> None:
         self.weeks, self.sif, self.critical, self.reports = (list(weeks), list(sif),
                                                               list(critical), list(reports))
+        #: What each point's tooltip is headed with - the whole week, with its year.
+        self.titles = list(titles) or [f"w/c {week}" for week in self.weeks]
         self.reference = reference
         self.update()
 
@@ -310,7 +313,7 @@ class TrendChart(QWidget):
             self.hover = index
             self.update()
         QToolTip.showText(event.globalPosition().toPoint(),
-                          f"w/c {self.weeks[index]}\nSIF potential: {self.sif[index]:g}\n"
+                          f"{self.titles[index]}\nSIF potential: {self.sif[index]:g}\n"
                           f"Critical risk: {self.critical[index]:g}\n"
                           f"Total reports: {self.reports[index]:g}", self)
 

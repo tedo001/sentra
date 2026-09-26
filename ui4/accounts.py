@@ -134,7 +134,14 @@ class AccountsPage(Page):
         self.create.setObjectName("Primary")
         self.create.setEnabled(False)
         self.create.clicked.connect(self._create)
-        self.form.add(self.create, 0)
+        self.clear_form_button = QPushButton("Clear form")
+        self.clear_form_button.setToolTip("Empty the form and start again")
+        self.clear_form_button.clicked.connect(self.reset_form)
+        buttons = QHBoxLayout()
+        buttons.setSpacing(8)
+        buttons.addWidget(self.create, 1)
+        buttons.addWidget(self.clear_form_button)
+        self.form.body.addLayout(buttons)
         self.error = QLabel("")
         self.error.setObjectName("ErrorText")
         self.error.setWordWrap(True)
@@ -165,6 +172,16 @@ class AccountsPage(Page):
             widget.setPlaceholderText(placeholder)
         self.form.add(widget)
         return widget
+
+    def reset_form(self) -> None:
+        """The Clear form button: every field back to its starting value."""
+        for field in (self.full_name, self.email):
+            field.clear()
+        for box in (self.role, self.site, self.department):
+            box.setCurrentIndex(0)
+        self.active.setChecked(True)
+        self.error.clear()
+        self._validate()
 
     def _validate(self) -> None:
         role = str(self.role.currentData())

@@ -28,7 +28,7 @@ from .hotspots import HotspotsPage
 from .ingest import IngestPage
 from .reports import ReportsPage
 from .review import ReviewPage
-from .present import (age, case_line, describe_action, queued_at, received, review_status,
+from .present import (fmt_date, fmt_datetime, fmt_time, in_zone, zone, age, case_line, describe_action, queued_at, received, review_status,
                       row_when, trigger_counts, weekly_series)
 
 __all__ = ["HSEPages"]
@@ -95,8 +95,8 @@ class HSEPages:
     def _refresh_home(self) -> None:
         page = self.home_page
         now = datetime.now()
-        page.set_heading(now.strftime("%a %d %b %Y · %H:%M"),
-                         f"Updated {now.strftime('%H:%M:%S')}")
+        page.set_heading(f"{now.strftime('%a')} {fmt_date(now)} · {fmt_time(now)}",
+                         f"Updated {fmt_time(now, seconds=True)}")
         rows = self.rows
         decisions = self._decisions_by_row()
         by_ref = {str(row.get("reference")): row for row in rows}
@@ -196,8 +196,8 @@ class HSEPages:
                 keys.append("reviewed")
             cases.append({**row, "trigger": item.get("trigger", ""),
                           "status": review_status(row, decision),
-                          "date": when.strftime("%d %b\n%H:%M") if when and row.get(
-                              "analysed_at") and not row.get("reported_on")
+                          "date": (in_zone(when).strftime("%d %b\n%H:%M ") + zone()[1])
+                          if when and row.get("analysed_at") and not row.get("reported_on")
                           else when.strftime("%d %b\n%Y") if when else "-",
                           "_in": tuple(keys)})
         return cases
@@ -221,8 +221,11 @@ class HSEPages:
             return
         decision = self._decisions_by_row()[index]
         meta = " \u00b7 ".join(str(part) for part in (
-            row.get("site") or row.get("location"), row.get("activity"), received(row),
-            f"reported by {row['reported_by']}" if row.get("reported_by") else "") if part)
+            row.get("site") or row.get("location"), row.get("activity"),
+            f"reported {received(row)}" if row.get("reported_on") else "",
+            f"reported by {row['reported_by']}" if row.get("reported_by") else "",
+            f"analysed {fmt_datetime(row['analysed_at'])}" if row.get("analysed_at") else "")
+            if part)
         waiting = age(queued_at(row)) if decision is None else ""
         page.case.show_case(row, status=review_status(row, decision), meta=meta,
                             waiting=waiting)
@@ -455,8 +458,7 @@ class HSEPages:
         span = {"30": "Last 30 days", "90": "Last 90 days", "365": "Last 12 months"}[period]
         if latest is not None:
             start = latest - timedelta(days=int(period) - 1)
-            span += (f" ({start.strftime('%d %b').lstrip('0')} \u2013 "
-                     f"{latest.strftime('%d %b %Y').lstrip('0')})")
+            span += f" ({fmt_date(start)} \u2013 {fmt_date(latest)})"
         page.set_caption(f"{span} \u00b7 all figures are engine assessments unless "
                          "marked reviewed")
         page.head.caption.setToolTip("The period runs back from the latest dated report, so "
@@ -593,7 +595,54 @@ class IngestFlow:
         page.retry_requested.connect(self.retry_item)
         page.remove_requested.connect(self.remove_item)
         page.analyse_requested.connect(self.analyse_item)
+        page.cancel_requested.connect(self.cancel_processing)
+        page.clear_requested.connect(self.clear_documents)
         return page
+
+    #: Items that are finished with, and can be cleared from the list.
+    SETTLED = ("done", "failed", "cancelled", "attention", "extracted", "queued")
+
+    @requires(ANALYSE)
+    def cancel_processing(self) -> int:
+        """Stop the running document and drop everything waiting behind it."""
+        by = self.session.full_name if self.session.authenticated else "the operator"
+        cancelled = 0
+        for job in self._ingest_jobs:
+            item = job[1]
+            if item.get("state") == "waiting":
+                item["state"] = "cancelled"
+                self._log(item, f"cancelled by {by} before it started")
+                cancelled += 1
+        self._ingest_jobs.clear()
+        current = getattr(self, "_current_item", None)
+        if self.worker is not None and self.worker.isRunning():
+            self.worker.requestInterruption()
+            if current is not None and current.get("state") == "processing":
+                current["state"] = "cancelled"
+                self._log(current, f"cancelled by {by} while running - reports already "
+                                   "analysed are kept")
+                cancelled += 1
+        if cancelled:
+            self.audit.functionality("processing cancelled", items=cancelled)
+            self._set_status(f"Cancelled {cancelled} item(s); reports already analysed are kept.")
+        self._refresh_ingest()
+        return cancelled
+
+    @requires(ANALYSE)
+    def clear_documents(self) -> int:
+        """Clear finished, failed, cancelled and unstarted items from the list."""
+        keep, gone = [], []
+        for item in self.ingest_items:
+            (gone if item["state"] in self.SETTLED else keep).append(item)
+        for item in gone:
+            if item.get("document") in self.documents:
+                self.documents.remove(item["document"])
+        if gone:
+            self._sync_pending_blocks()
+        self.ingest_items = keep
+        self._ingest_selected = -1
+        self._refresh_ingest()
+        return len(gone)
 
     # -- staging and the queue ---------------------------------------------------
 
@@ -610,7 +659,7 @@ class IngestFlow:
 
     @staticmethod
     def _log(item: Dict[str, object], message: str) -> None:
-        item["log"].append(f"{datetime.now().strftime('%H:%M:%S')}  {message}")
+        item["log"].append(f"{fmt_time(datetime.now(), seconds=True)}  {message}")
 
     @requires(ANALYSE)
     def stage_files(self, paths: List[str]) -> int:
@@ -819,7 +868,10 @@ class IngestFlow:
         references = list(self._batch_refs)
         item["references"] = references
         item["reports"] = count
-        item["state"], item["stage"] = "done", "Review"
+        if item.get("state") == "cancelled":
+            self._log(item, f"stopped after {count} report(s) - they are kept")
+        else:
+            item["state"], item["stage"] = "done", "Review"
         for reference in references:
             index, row = self._row_for(reference)
             if row is not None and not row.get("source"):
@@ -868,6 +920,7 @@ class IngestFlow:
         "failed": ("\u2715 Failed", "fail"),
         "attention": ("\u25c6 Needs attention", "warn"),
         "extracted": ("Extracted", "info"),
+        "cancelled": ("Cancelled", "grey"),
     }
 
     def _refresh_ingest(self) -> None:
@@ -895,7 +948,8 @@ class IngestFlow:
         page.set_documents(rows, f"this session \u00b7 {len(rows)} item{'s' if len(rows) != 1 else ''}",
                            processing, failed, attention)
         staged = sum(1 for item in self.ingest_items if item["state"] == "queued")
-        page.set_staged(staged, self.worker is not None)
+        page.set_staged(staged, self.worker is not None,
+                        sum(1 for item in self.ingest_items if item["state"] in self.SETTLED))
         ocr_active = sum(1 for item in self.ingest_items
                          if item["state"] == "processing" and item["stage"] == "OCR")
         held = attention + sum(1 for item in self.ingest_items if item["state"] == "extracted")

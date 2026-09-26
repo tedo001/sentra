@@ -49,6 +49,9 @@ class SentraActions(ActionsView):
         self.category_box.setFixedWidth(170)
         self.category_box.currentIndexChanged.connect(
             lambda _i: self.set_category(str(self.category_box.currentData() or "")))
+        self.clear_filters_button = QPushButton("Clear filters")
+        self.clear_filters_button.setToolTip("Every category and every state")
+        self.clear_filters_button.clicked.connect(self.clear_filters)
         self.add_top = QPushButton("+  Add New")
         self.add_top.setObjectName("Primary")
         self.add_top.clicked.connect(lambda: self.add_requested.emit(self.selected.isoformat()))
@@ -126,8 +129,12 @@ class SentraActions(ActionsView):
 
     def head_widgets(self) -> List[QWidget]:
         """What the page head carries in the revamp: legend, filters, view, add."""
-        return [self.legend, self.category_box, self.filter, self.week_button,
-                self.month_button, self.add_top]
+        return [self.legend, self.category_box, self.filter, self.clear_filters_button,
+                self.week_button, self.month_button, self.add_top]
+
+    def clear_filters(self) -> None:
+        self.category_box.setCurrentIndex(0)
+        self.filter.setCurrentIndex(0)
 
     def set_category(self, name: str) -> None:
         self.category = name

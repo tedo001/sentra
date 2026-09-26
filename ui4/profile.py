@@ -137,7 +137,18 @@ class ProfilePage(Page):
         self.change.setObjectName("Primary")
         self.change.setMaximumWidth(420)
         self.change.clicked.connect(self._request_change)
-        form.addWidget(self.change)
+        self.clear_password = QPushButton("Clear")
+        self.clear_password.setToolTip("Empty the three password fields")
+        self.clear_password.clicked.connect(self.clear_password_fields)
+        buttons = QHBoxLayout()
+        buttons.setSpacing(8)
+        buttons.addWidget(self.change, 1)
+        buttons.addWidget(self.clear_password)
+        holder = QWidget()
+        holder.setMaximumWidth(420)
+        holder.setLayout(buttons)
+        buttons.setContentsMargins(0, 0, 0, 0)
+        form.addWidget(holder)
         self.security_note = _l("", "CardCaption")
         self.security_note.setWordWrap(True)
         form.addWidget(self.security_note)
@@ -191,6 +202,11 @@ class ProfilePage(Page):
             self.set_security_note("The two new passwords do not match.", False)
             return
         self.password_change_requested.emit(self.current.text(), self.new.text())
+
+    def clear_password_fields(self) -> None:
+        for field in (self.current, self.new, self.confirm):
+            field.clear()
+        self.security_note.clear()
 
     def set_security_note(self, text: str, ok: bool) -> None:
         self.security_note.setText(text)

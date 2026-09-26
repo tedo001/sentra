@@ -303,7 +303,25 @@ class WorkspaceLogin(LoginDialog):
         self.change_button.clicked.connect(self.change_password)
         self.new_confirm.returnPressed.connect(self.change_password)
         layout.addWidget(self.change_button)
+        layout.addSpacing(6)
+        cancel = QPushButton("Cancel and sign in as someone else")
+        cancel.setObjectName("Link")
+        cancel.setFlat(True)
+        cancel.setCursor(Qt.CursorShape.PointingHandCursor)
+        cancel.clicked.connect(self.cancel_change)
+        row = QHBoxLayout()
+        row.setContentsMargins(0, 0, 0, 0)
+        row.addWidget(cancel)
+        row.addStretch(1)
+        layout.addLayout(row)
         return page
+
+    def cancel_change(self) -> None:
+        """Back to the sign-in; the one-time password stays unused and valid."""
+        self._pending, self._pending_password = None, ""
+        for field in (self.new_password, self.new_confirm, self.password):
+            field.clear()
+        self.show_page("sign in")
 
     def _forgot_page(self) -> QWidget:
         page = QWidget()

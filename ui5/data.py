@@ -99,6 +99,7 @@ class DataPage(Page):
     list_requested = pyqtSignal()
     verify_requested = pyqtSignal(str)
     restore_requested = pyqtSignal(str)
+    revert_requested = pyqtSignal()
 
     def __init__(self) -> None:
         super().__init__("Data & Backup",
@@ -182,7 +183,9 @@ class DataPage(Page):
         self.query.returnPressed.connect(self._search)
         find = QPushButton("Search")
         find.clicked.connect(self._search)
-        card.body.addLayout(_row(self.query, find))
+        clear = QPushButton("Clear")
+        clear.clicked.connect(self.clear_search)
+        card.body.addLayout(_row(self.query, find, clear))
         self.similar = DesignTable(SIMILAR_COLUMNS, row_height=30)
         self.similar.setMinimumHeight(170)
         self.similar.link_clicked.connect(self._open)
@@ -274,7 +277,10 @@ class DataPage(Page):
         save.clicked.connect(lambda: self._emit_target(self.save_target))
         test = QPushButton("Test connection")
         test.clicked.connect(lambda: self._emit_target(self.test_target))
-        card.body.addLayout(_row(save, test, None))
+        cancel = QPushButton("Cancel changes")
+        cancel.setToolTip("Put the form back to the saved settings")
+        cancel.clicked.connect(self.revert_requested.emit)
+        card.body.addLayout(_row(save, test, cancel, None))
         self.target_note = card.add(_label("", "Hint"))
         card.body.addStretch(1)
         return card
@@ -301,6 +307,11 @@ class DataPage(Page):
         return card
 
     # -- page events -------------------------------------------------------------------
+
+    def clear_search(self) -> None:
+        self.query.clear()
+        self.similar.set_rows([])
+        self.vector_note.setText("")
 
     def _search(self) -> None:
         if self.query.text().strip():

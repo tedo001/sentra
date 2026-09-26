@@ -47,6 +47,16 @@ class TestPresent(unittest.TestCase):
         self.assertEqual(trigger_counts(queue), [("Critical risk", 2), ("Thin evidence", 1)])
 
     def test_the_timeline_speaks_of_you(self) -> None:
+        # Shown in the workstation's own zone, so the stored clock time reads back.
+        from datetime import datetime
+        from unittest import mock
+
+        import ui4.present as present
+
+        local = datetime.now().astimezone().tzinfo
+        patcher = mock.patch.object(present, "zone", lambda: (local, "LOCAL"))
+        patcher.start()
+        self.addCleanup(patcher.stop)
         entry = {"action": "review decision", "user": "a.baruah", "at": "2026-09-25T13:40:07",
                  "detail": {"decision": "confirmed", "reference": "NM-26-0409"}}
         self.assertEqual(describe_action(entry, "a.baruah"),
@@ -75,3 +85,24 @@ class TestPresent(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestDatesAndTimes(unittest.TestCase):
+    def test_one_format_and_the_zone_named(self) -> None:
+        from datetime import date, datetime, timedelta, timezone
+        from unittest import mock
+
+        import ui4.present as present
+
+        ist = timezone(timedelta(hours=5, minutes=30))
+        with mock.patch.object(present, "zone", lambda: (ist, "IST")), \
+                mock.patch.object(present, "date_format", lambda: "%d %b %Y"):
+            stored = datetime(2026, 9, 25, 8, 38, tzinfo=timezone.utc)
+            self.assertEqual(present.fmt_datetime(stored), "25 Sep 2026, 14:08 IST")
+            self.assertEqual(present.fmt_time(stored), "14:08 IST")
+            # A report's own date is a calendar date and is never shifted.
+            self.assertEqual(present.fmt_date("2026-01-07"), "7 Jan 2026")
+            self.assertEqual(present.received({"reported_on": "2026-01-07"}), "7 Jan 2026")
+            self.assertEqual(present.fmt_week(date(2025, 12, 29)), "29 Dec 2025 – 4 Jan 2026")
+        with mock.patch.object(present, "date_format", lambda: "%Y-%m-%d"):
+            self.assertEqual(present.fmt_date("2026-01-07"), "2026-01-07")

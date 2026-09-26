@@ -151,6 +151,9 @@ class AuditPage(Page):
             box.setFixedWidth(width)
             box.currentIndexChanged.connect(lambda _i: self.filters_changed.emit())
             row.addWidget(box)
+        self.clear_button = QPushButton("Clear filters")
+        self.clear_button.clicked.connect(self.clear_filters)
+        row.addWidget(self.clear_button)
         row.addStretch(1)
         self.count = QLabel("")
         self.count.setObjectName("MonoFaint")
@@ -195,6 +198,14 @@ class AuditPage(Page):
         self.body.addLayout(body, 1)
 
     # -- filters ------------------------------------------------------------------------
+
+    def clear_filters(self) -> None:
+        """Everyone, every role, every action, the last 7 days."""
+        for box, index in ((self.user, 0), (self.role, 0), (self.action, 0), (self.period, 1)):
+            box.blockSignals(True)
+            box.setCurrentIndex(index)
+            box.blockSignals(False)
+        self.filters_changed.emit()
 
     def set_choices(self, users: Sequence[str], roles: Sequence[str],
                     actions: Sequence[str]) -> None:

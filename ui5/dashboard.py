@@ -13,19 +13,29 @@ Same interface as :class:`ui4.dashboard.DashboardPage`, plus
 
 from __future__ import annotations
 
+from datetime import timedelta
 from typing import Dict, Sequence, Tuple
 
 from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import QComboBox, QGridLayout, QHBoxLayout, QLabel, QPushButton
 
 from ui4.dashboard import RECENT_COLUMNS
-from ui4.kit import Card, DesignTable, Page, Segmented, StatStrip, link_button
+from ui4.kit import Card, Col, DesignTable, Page, Segmented, StatStrip, link_button
+from ui4.present import fmt_date, fmt_week, received
 
 from .charts import AxisBarChart, TrendChart
 
 __all__ = ["SentraDashboard"]
 
 PERIODS = (("30", "Last 30 days"), ("90", "Last 90 days"), ("365", "12 months"))
+#: The latest reports with when each happened, as the report states it.
+SENTRA_RECENT_COLUMNS = (
+    Col("reference", "Ref", 84, "mono", style=RECENT_COLUMNS[0].style),
+    Col("reported", "Reported", 104, "muted", value=received),
+    RECENT_COLUMNS[1],
+    Col("risk_text", "Risk", 50, align="right", style=RECENT_COLUMNS[2].style),
+    Col("status", "Status", 92, "pill"),
+)
 VIOLET = "#7C3AED"
 
 
@@ -58,8 +68,14 @@ class SentraDashboard(Page):
             box.currentIndexChanged.connect(lambda _index: self.filter_changed.emit())
         export = QPushButton("Export CSV")
         export.clicked.connect(self.export_requested.emit)
-        for widget in (self.period, self.site, self.activity, export):
+        self.clear_button = QPushButton("Clear filters")
+        self.clear_button.setToolTip("Last 90 days, every site, every activity")
+        self.clear_button.clicked.connect(self.clear_filters)
+        for widget in (self.period, self.site, self.activity, self.clear_button, export):
             self.head.add(widget)
+        self.updated = QLabel("")
+        self.updated.setObjectName("PageCaption")
+        self.head.actions.insertWidget(0, self.updated)
 
         self.stats = StatStrip(("Total reports", "SIF potential", "Mean risk score",
                                 "Critical risk", "Awaiting review"))
@@ -79,7 +95,7 @@ class SentraDashboard(Page):
         queue = link_button("Review queue")
         queue.clicked.connect(self.queue_requested.emit)
         self.recent.add_head(queue)
-        self.recent_table = DesignTable(RECENT_COLUMNS, row_height=30)
+        self.recent_table = DesignTable(SENTRA_RECENT_COLUMNS, row_height=30)
         self.recent_table.row_activated.connect(self._open)
         self.recent.add(self.recent_table, 1)
         top = QGridLayout()
@@ -155,7 +171,8 @@ class SentraDashboard(Page):
                 str(self.activity.currentData() or ""))
 
     def set_caption(self, text: str) -> None:
-        self.head.caption.setText(text)
+        self.head.caption.setText(text.replace(
+            "all figures are engine assessments unless marked reviewed", "engine assessments"))
         label = dict(PERIODS).get(self.period.current, "")
         for caption in (self.rules_period, self.barriers_period):
             caption.setText(label)
@@ -180,20 +197,36 @@ class SentraDashboard(Page):
         reports = [float(week["reports"]) for week in weeks]
         average = sum(sif) / len(sif) if sif else 0.0
         self.trend_chart.set_data(labels, sif, critical, reports,
-                                  (average, "Average") if weeks else None)
-        self.trend_span.setText(f"{labels[0]} → {labels[-1]} · weekly counts"
-                                if labels else "no dated reports")
+                                  (average, "Average") if weeks else None,
+                                  titles=[f"Week {week.get('week') or fmt_week(week['start'])}"
+                                          for week in weeks])
+        self.trend_span.setText(
+            f"{fmt_date(weeks[0]['start'])} → "
+            f"{fmt_date(weeks[-1]['start'] + timedelta(days=6))} · weekly counts"
+            if weeks else "no dated reports")
         if weeks:
             peak = max(weeks, key=lambda week: week["sif"])
             peak_critical = max(weeks, key=lambda week: week["critical"])
-            values = ((f"{peak['sif']:g}", f"w/c {peak['label']}"),
+            values = ((f"{peak['sif']:g}", f"week of {fmt_week(peak['start'])}"),
                       (f"{average:.1f}", period_label),
-                      (f"{peak_critical['critical']:g}", f"w/c {peak_critical['label']}"),
+                      (f"{peak_critical['critical']:g}",
+                       f"week of {fmt_week(peak_critical['start'])}"),
                       (f"{sum(reports):g}", "all documents"))
         else:
             values = (("-", ""),) * 4
         for cell, (value, note) in zip(self.summary.cells, values):
             cell.set(value, note)
+
+    def clear_filters(self) -> None:
+        for box in (self.site, self.activity):
+            box.blockSignals(True)
+            box.setCurrentIndex(0)
+            box.blockSignals(False)
+        self.period.select("90")
+        self.period_changed.emit("90")
+
+    def set_updated(self, text: str) -> None:
+        self.updated.setText(text)
 
     def set_recent(self, rows: Sequence[Dict[str, object]]) -> None:
         self.recent_table.set_rows(rows)

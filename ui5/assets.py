@@ -241,8 +241,13 @@ class AssetMemoryPage(Page):
             self.show_box.addItem(label, key)
         self.show_box.setFixedWidth(180)
         self.show_box.currentIndexChanged.connect(lambda _index: self._apply())
+        self.clear_button = QPushButton("Clear")
+        self.clear_button.setToolTip("Every asset, no search")
+        self.clear_button.clicked.connect(self.clear_filters)
+        self.search.setClearButtonEnabled(True)
         self.head.add(self.search)
         self.head.add(self.show_box)
+        self.head.add(self.clear_button)
 
         self.stats = StatStrip(("Assets on record", "Recurring hazards",
                                 "Repeated control failures", "Emerging SIF precursors",
@@ -343,6 +348,13 @@ class AssetMemoryPage(Page):
     def select(self, name: str) -> None:
         self.current = name
         self.search.clear()
+        self.show_box.setCurrentIndex(0)
+        self._apply()
+
+    def clear_filters(self) -> None:
+        self.search.blockSignals(True)
+        self.search.clear()
+        self.search.blockSignals(False)
         self.show_box.setCurrentIndex(0)
         self._apply()
 

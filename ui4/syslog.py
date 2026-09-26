@@ -94,7 +94,9 @@ class SysLogPage(Page):
         self.live.setChecked(True)
         self.count = QLabel("")
         self.count.setObjectName("MonoFaint")
-        for widget in (self.search, self.span, self.service, self.levels):
+        self.clear_button = QPushButton("Clear filters")
+        self.clear_button.clicked.connect(self.clear_filters)
+        for widget in (self.search, self.span, self.service, self.levels, self.clear_button):
             row.addWidget(widget)
         row.addStretch(1)
         row.addWidget(self.live)
@@ -125,6 +127,18 @@ class SysLogPage(Page):
         self.body.addLayout(body, 1)
         self.log_file = ""
         self._selected = -1
+
+    def clear_filters(self) -> None:
+        """Every service and level, the last 24 hours, no search."""
+        for widget in (self.search, self.span, self.service):
+            widget.blockSignals(True)
+        self.search.clear()
+        self.span.setCurrentIndex(1)
+        self.service.setCurrentIndex(0)
+        for widget in (self.search, self.span, self.service):
+            widget.blockSignals(False)
+        self.levels.select("")
+        self.filters_changed.emit()
 
     @property
     def filters(self) -> Dict[str, object]:

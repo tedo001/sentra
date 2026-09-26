@@ -10,12 +10,13 @@ review" in HSE Review.
 from __future__ import annotations
 
 from collections import Counter
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone, tzinfo
 from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 
 __all__ = ["ACTION_WORDS", "age", "case_line", "clock", "day_month", "describe_action",
            "initials", "queued_at", "received", "review_status", "row_when", "stamp",
-           "trigger_counts", "weekly_series", "weekly_table"]
+           "trigger_counts", "weekly_series", "weekly_table", "fmt_date", "fmt_time",
+           "fmt_datetime", "fmt_week", "in_zone", "zone", "date_format", "ZONES"]
 
 #: Audit actions as a sentence about a person, for timelines.
 ACTION_WORDS = {
@@ -97,25 +98,114 @@ def day_month(value: Optional[datetime]) -> str:
     return value.strftime("%d %b").lstrip("0") if value else "-"
 
 
-def received(row: Dict[str, object]) -> str:
-    """'25 Sep 11:42' - with the time only when the source had one."""
-    when = row_when(row)
+# -- dates and times, one way everywhere ---------------------------------------------
+#
+# Settings chooses the date format and the time zone; every page asks these
+# functions rather than calling strftime itself. Times are stored as this
+# workstation's local clock, so they are converted to the chosen zone and the
+# zone is named. A report's own date ("the export said 7 Jan") is a calendar
+# date, not an instant, and is never shifted.
+
+#: Settings' time zones, as fixed offsets: zoneinfo needs a time zone database
+#: that a Windows build does not carry.
+ZONES: Dict[str, Tuple[tzinfo, str]] = {
+    "Asia/Kolkata (IST, UTC+5:30)": (timezone(timedelta(hours=5, minutes=30)), "IST"),
+    "UTC": (timezone.utc, "UTC"),
+}
+DEFAULT_ZONE = "Asia/Kolkata (IST, UTC+5:30)"
+DEFAULT_DATE_FORMAT = "%d %b %Y"
+
+
+def _setting(key: str, default: str) -> str:
+    try:
+        from sif import prefs
+
+        return str(prefs.get(key, default) or default)
+    except Exception:  # noqa: BLE001 - formatting must never fail
+        return default
+
+
+def date_format() -> str:
+    return _setting("date_format", DEFAULT_DATE_FORMAT)
+
+
+def zone() -> Tuple[tzinfo, str]:
+    return ZONES.get(_setting("timezone", DEFAULT_ZONE), ZONES[DEFAULT_ZONE])
+
+
+def in_zone(when: datetime) -> datetime:
+    """A stored local time as it reads in the chosen zone."""
+    target, _name = zone()
+    if when.tzinfo is None:
+        when = when.astimezone()          # this workstation's clock
+    return when.astimezone(target)
+
+
+def fmt_date(value: object) -> str:
+    """'25 Sep 2026' (or the format Settings chose); a calendar date is not shifted."""
+    if isinstance(value, datetime):
+        when = value
+    elif isinstance(value, date):
+        return value.strftime(date_format()).lstrip("0") if date_format().startswith("%d") \
+            else value.strftime(date_format())
+    else:
+        text = str(value or "").strip()
+        when = _parse(text)
+        if when is None:
+            return "-"
+        if len(text) > 10:
+            when = in_zone(when)
+    out = when.strftime(date_format())
+    return out.lstrip("0") if date_format().startswith("%d %b") else out
+
+
+def fmt_time(value: object, seconds: bool = False) -> str:
+    """'14:06 IST' - in the chosen zone, named."""
+    when = value if isinstance(value, datetime) else _parse(value)
     if when is None:
         return "-"
+    local = in_zone(when)
+    return local.strftime("%H:%M:%S" if seconds else "%H:%M") + " " + zone()[1]
+
+
+def fmt_datetime(value: object, seconds: bool = False) -> str:
+    """'25 Sep 2026, 14:06 IST' - date, time and zone."""
+    when = value if isinstance(value, datetime) else _parse(value)
+    if when is None:
+        return "-"
+    local = in_zone(when)
+    day = local.strftime(date_format())
+    if date_format().startswith("%d %b"):
+        day = day.lstrip("0")
+    return f"{day}, {local.strftime('%H:%M:%S' if seconds else '%H:%M')} {zone()[1]}"
+
+
+def fmt_week(start: date, days: int = 7) -> str:
+    """'27 Oct – 2 Nov 2025' - one week, for a chart's tooltip."""
+    end = start + timedelta(days=days - 1)
+    first = start.strftime("%d %b").lstrip("0") + (
+        start.strftime(" %Y") if start.year != end.year else "")
+    return f"{first} – {end.strftime('%d %b %Y').lstrip('0')}"
+
+
+def received(row: Dict[str, object]) -> str:
+    """When the report says it happened: its date, with the time only when the
+    source had one ('7 Jan 2026' or '25 Sep 2026, 11:42 IST')."""
     reported = str(row.get("reported_on") or "")
-    if reported and len(reported) <= 10:
-        return when.strftime("%d %b %Y").lstrip("0")
-    return when.strftime("%d %b %H:%M").lstrip("0")
+    if reported:
+        return fmt_date(reported) if len(reported) <= 10 else fmt_datetime(reported)
+    analysed = row.get("analysed_at")
+    return fmt_datetime(analysed) if analysed else "-"
 
 
 def clock(value: object) -> str:
     when = _parse(value)
-    return when.strftime("%H:%M") if when else ""
+    return in_zone(when).strftime("%H:%M") if when else ""
 
 
 def stamp(value: object) -> str:
-    """'2026-09-25 13:52:41' - the audit and log tables' full timestamp."""
-    return str(value or "").replace("T", " ")[:19]
+    """'25 Sep 2026, 13:52:41 IST' - the audit and log tables' full timestamp."""
+    return fmt_datetime(value, seconds=True) if _parse(value) else str(value or "")
 
 
 def age(since: Optional[datetime], now: Optional[datetime] = None) -> str:
@@ -232,7 +322,8 @@ def weekly_table(rows: Sequence[Dict[str, object]], weeks: int = 13,
     last_week = last - timedelta(days=last.weekday())
     first_week = last_week - timedelta(weeks=weeks - 1)
     table = [{"start": first_week + timedelta(weeks=i),
-              "label": (first_week + timedelta(weeks=i)).strftime("%b %d"),
+              "label": (first_week + timedelta(weeks=i)).strftime("%d %b").lstrip("0"),
+              "week": fmt_week(first_week + timedelta(weeks=i)),
               "sif": 0, "critical": 0, "reports": 0} for i in range(weeks)]
     for day, row in dated:
         index = (day - timedelta(days=day.weekday()) - first_week).days // 7

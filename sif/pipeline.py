@@ -36,7 +36,7 @@ from .lexical import LexicalEngine, SEED_REPORTS
 from .patterns import Hotspot, PatternDetector
 from .preprocessing import NLPPreprocessor
 from .review import ReviewItem, ReviewQueue
-from .scoring import RiskScorer
+from .scoring import RiskScorer, cap_probability
 
 __all__ = ["PipelineResult", "Intelligence", "SIFPipeline"]
 
@@ -254,7 +254,7 @@ class SIFPipeline:
             location=entities.location,
             barrier_failure=entities.barrier,
             energy_source=sif.energy_label,
-            p_sif=sif.probability,
+            p_sif=cap_probability(sif.probability),
             risk_score=risk.value,
             risk_band=risk.band,
             severity_hint=self._severity(sif, lexical.severity_hint),

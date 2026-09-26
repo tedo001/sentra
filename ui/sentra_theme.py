@@ -270,6 +270,13 @@ QFrame#MemoryPanel {{ background: {G[50]}; border: 1px solid {G[200]}; border-ra
 QLabel#SignalKind {{ font-size: 12px; font-weight: 600; color: {G[800]}; }}
 QLabel#SignalText {{ font-size: 12px; color: {G[600]}; }}
 QLabel#SignalMark {{ font-size: 12px; }}
+/* the decision trail and each case's decision history */
+QFrame#HistoryPanel {{ background: #FFFFFF; border: 1px solid {G[200]}; border-radius: 6px; }}
+QFrame#HistoryPanel QLabel {{ background: transparent; }}
+QLabel#HistoryLine {{ font-size: 12px; color: {G[700]}; }}
+QFrame#TrailFilters {{ background: {G[50]}; border-bottom: 1px solid {G[200]}; }}
+/* the risk map's zoom buttons */
+QPushButton#MapButton {{ padding: 4px 0; font-size: 14px; font-weight: 600; }}
 /* pop-ups in the revamp's greys (the rules above keep them white everywhere) */
 QMenu, QFrame#WorkspaceHeader QMenu, QFrame#TabRow QMenu, QFrame#Card QMenu,
 QWidget#DesignPage QMenu {{

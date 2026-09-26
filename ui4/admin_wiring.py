@@ -25,6 +25,7 @@ from sif.version import __version__
 from .accounts import AccountsPage
 from .auditlog import AuditPage, describe_entry
 from .engines import EnginesPage
+from .present import fmt_time, in_zone
 from .settings import SettingsPage
 from .syslog import SysLogPage, service_of
 
@@ -72,7 +73,7 @@ def _version(package: str) -> str:
 def _short_time(value: object) -> str:
     """'2026-09-10 15:37:34' -> '10 Sep 15:37'."""
     try:
-        return datetime.fromisoformat(str(value)[:19]).strftime("%d %b %H:%M")
+        return in_zone(datetime.fromisoformat(str(value)[:19])).strftime("%d %b %H:%M")
     except ValueError:
         return str(value or "")
 
@@ -182,12 +183,12 @@ class AdminPages:
         page = self.engines_page
         checked = getattr(self, "_engines_checked", None)
         page.head.caption.setText(f"host {socket.gethostname()}" + (
-            f" · checked {checked.strftime('%H:%M')}" if checked else ""))
+            f" · checked {fmt_time(checked)}" if checked else ""))
         analysed = self._last_audit("reports analysed")
         last_run = "-"
         if analysed is not None:
             detail = analysed.get("detail") or {}
-            last_run = (f"{str(analysed.get('at'))[11:16]} · {detail.get('count', 0)} reports")
+            last_run = (f"{fmt_time(analysed.get('at'))} · {detail.get('count', 0)} reports")
         kpis = self._intelligence.kpis if self._intelligence is not None else {}
         encoder = str(kpis.get("encoder") or "")
 
@@ -224,7 +225,7 @@ class AdminPages:
              ("Version", _version("paddleocr") or "not installed"),
              ("Host", "In-process · CPU"),
              ("Connection", connection),
-             ("Last run", f"{str(read.get('at'))[11:16]} · "
+             ("Last run", f"{fmt_time(read.get('at'))} · "
                           f"{(read.get('detail') or {}).get('name', '')}" if read else "-")),
             f"Confidence floor 0.70 · {failures} failure(s) this session")
 
@@ -242,7 +243,7 @@ class AdminPages:
              ("Version", "Ollama"),
              ("Host", self.llm.host),
              ("Connection", str(self.llm_message)[:60]),
-             ("Last run", str(probe.get("at"))[11:16] if probe else "-")),
+             ("Last run", fmt_time(probe.get("at")) if probe else "-")),
             ("Used to translate non-English reports for reading"
              + (" and as a fourth opinion" if self.llm_enabled else "")))
 
@@ -525,7 +526,7 @@ class AdminPages:
             page.set_banner(
                 f"\u2713  <b>Chain intact.</b> {report.entries:,} entries"
                 + (f" since {_short_time(first)[:6]}" if first else "")
-                + (f" \u00b7 last verified today {checked.strftime('%H:%M')}" if checked else
+                + (f" \u00b7 last verified today {fmt_time(checked)}" if checked else
                    " \u00b7 checked when this page opened")
                 + f" \u00b7 stored at {audit_module.audit_file_path()}", True)
         else:

@@ -188,6 +188,8 @@ class SentraLogin(WorkspaceLogin):
         self.password.setPlaceholderText("Password")
         self.remember.setText("Remember Me")
         self.forgot_name.setPlaceholderText("Username or email")
+        for field in (self.username, self.forgot_name):
+            field.setClearButtonEnabled(True)
         # Each page as tall as its own content: labels sit on their fields, and
         # the block centres on what is shown rather than on the tallest page.
         for index in range(self.pages.count()):

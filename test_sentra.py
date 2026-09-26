@@ -425,6 +425,111 @@ class TestSentra(unittest.TestCase):
         ocs4 = next(item for item in store.assets() if item["asset"] == "Duliajan OCS-4")
         self.assertTrue(ocs4["signal_list"])
 
+    # -- the map, the cap, the trail, clear and cancel -------------------------------------
+
+    def test_no_score_reads_100_and_no_probability_reads_1(self) -> None:
+        window = self._window("reviewer")
+        self._analyse_samples(window)
+        self.assertTrue(window.rows)
+        self.assertLessEqual(max(float(row["risk_score"]) for row in window.rows), 95.0)
+        self.assertLessEqual(max(float(row["p_sif"]) for row in window.rows), 0.95)
+        stored = window.datastore.pull_reports(set())
+        self.assertLessEqual(max(float(row["risk_score"]) for _fp, row in stored), 95.0)
+
+    def test_the_hotspot_map_places_sites_and_a_click_chooses_one(self) -> None:
+        from PyQt6.QtCore import QPointF, Qt
+        from PyQt6.QtTest import QTest
+
+        from ui5.geomap import RiskMap
+
+        window = self._window("reviewer")
+        self._analyse_samples(window)
+        window.resize(1440, 900)
+        window.show()
+        window.navigate("hotspots")
+        self.app.processEvents()
+        page = window.hotspots_page
+        self.assertIsInstance(page.map, RiskMap)
+        self.assertEqual(page.minimum.currentData(), 1)
+        self.assertEqual(len(page.map.placed), len(page.map.sites))
+        target = next(item for item in page.map._sites_on_screen()
+                      if item[0]["label"] == "Duliajan OCS-4")
+        QTest.mouseClick(page.map, Qt.MouseButton.LeftButton, pos=target[1].toPoint())
+        self.app.processEvents()
+        self.assertEqual(window._hotspot_site, "Duliajan OCS-4")
+        self.assertEqual(page.selected, "Duliajan OCS-4")
+        span = page.map.span
+        page.map.zoom(2.0, QPointF(100, 100))
+        self.assertAlmostEqual(page.map.span, span / 2)
+        page.map.fit()
+        page.clear_filters()
+        self.assertEqual(page.filters, (0, 1, "density"))
+        window.close()
+
+    def test_the_decision_trail_keeps_every_decision_and_which_stands(self) -> None:
+        window = self._window("reviewer")
+        self._analyse_samples(window)
+        window.navigate("review")
+        window.decide_case("NM-2601", "unclear")
+        window.decide_case("NM-2601", "confirmed")
+        page = window.review_page
+        page.show_mode("trail")
+        self.assertTrue(page.trail.isVisibleTo(page))
+        self.assertFalse(page.case_card.isVisibleTo(page))
+        rows = page.trail.rows
+        self.assertEqual([(row["reference"], row["decision"], row["standing"]) for row in rows],
+                         [("NM-2601", "confirmed", True), ("NM-2601", "unclear", False)])
+        self.assertIn("IST", rows[0]["when"])
+        page.trail.decision.setCurrentIndex(page.trail.decision.findData("unclear"))
+        self.assertEqual(len(page.trail.table.rows), 1)
+        page.trail.clear_filters()
+        self.assertEqual(len(page.trail.table.rows), 2)
+        page.trail.reference_requested.emit("NM-2601")
+        self.assertEqual(page.mode.current, "cases")
+        self.assertEqual(page.history.lines.count(), 2)
+
+    def test_clear_and_cancel(self) -> None:
+        from PyQt6.QtWidgets import QLineEdit
+
+        window = self._window("reviewer")
+        fields = [field for field in window.findChildren(QLineEdit)
+                  if field.echoMode() == QLineEdit.EchoMode.Normal and not field.isReadOnly()]
+        self.assertTrue(fields)
+        self.assertTrue(all(field.isClearButtonEnabled() for field in fields))
+        ingest = window.ingest_page
+        ingest.reference.setText("NM-1")
+        ingest.narrative.setPlainText("text")
+        ingest.clear_text.click()
+        self.assertEqual((ingest.reference.text(), ingest.narrative.toPlainText()), ("", ""))
+        window.stage_files([os.path.join(os.path.dirname(os.path.abspath(__file__)), "samples",
+                                         "near_miss_reports.csv")])
+        self.assertEqual(window.ingest_items[0]["state"], "queued")
+        window.start_processing()
+        self.assertTrue(ingest.cancel.isVisibleTo(ingest))
+        self.assertEqual(window.cancel_processing(), 1)
+        window.worker.wait(60_000)
+        self.app.processEvents()
+        window.wait_for_tasks()
+        self.assertEqual(window.ingest_items[0]["state"], "cancelled")
+        self.assertIn("processing cancelled", self._actions())
+        self.assertEqual(window.clear_documents(), 1)
+        self.assertEqual(window.ingest_items, [])
+        window.navigate("dashboard")
+        dash = window.dashboard_page
+        dash.period.buttons["30"].click()
+        dash.clear_button.click()
+        self.assertEqual(dash.filters, ("90", "", ""))
+
+    def test_dates_carry_the_zone_on_the_dashboard(self) -> None:
+        window = self._window("reviewer")
+        self._analyse_samples(window)
+        window.navigate("dashboard")
+        page = window.dashboard_page
+        self.assertTrue(page.updated.text().startswith("Updated "))
+        self.assertTrue(page.updated.text().endswith(" IST"))
+        self.assertIn("2026", page.trend_span.text())
+        self.assertIn("reported", [column.key for column in page.recent_table.columns])
+
     # -- the sign-in -----------------------------------------------------------------------------
 
     def test_the_sign_in_page_signs_in_by_email(self) -> None:

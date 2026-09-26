@@ -158,3 +158,19 @@ class TestRecommendation(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestGazetteer(unittest.TestCase):
+    def test_sites_are_placed_by_their_locality_and_spread_apart(self) -> None:
+        from sif.geo import LOCALITIES, locate, place_sites
+
+        self.assertEqual(locate("Duliajan OCS-4")[0], "duliajan")
+        self.assertEqual(locate("NAHARKATIYA Rig-12")[0], "naharkatiya")
+        self.assertIsNone(locate("Head office"))
+        placed, unplaced = place_sites(["Duliajan OCS-4", "Duliajan OCS-2", "Moran Field",
+                                        "Head office"])
+        self.assertEqual(unplaced, ["Head office"])
+        self.assertEqual(placed["Moran Field"][:2], LOCALITIES["moran"])
+        self.assertNotEqual(placed["Duliajan OCS-4"][:2], placed["Duliajan OCS-2"][:2])
+        self.assertEqual(place_sites(["Duliajan OCS-2", "Duliajan OCS-4"])[0]["Duliajan OCS-4"],
+                         placed["Duliajan OCS-4"])

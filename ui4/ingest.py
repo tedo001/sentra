@@ -157,6 +157,8 @@ class IngestPage(Page):
     analyse_after_toggled = pyqtSignal(bool)
     csv_rows_toggled = pyqtSignal(bool)
     document_selected = pyqtSignal(int)
+    cancel_requested = pyqtSignal()
+    clear_requested = pyqtSignal()
     retry_requested = pyqtSignal(int)
     remove_requested = pyqtSignal(int)
     analyse_requested = pyqtSignal(int)
@@ -212,7 +214,20 @@ class IngestPage(Page):
         self.start.setObjectName("Primary")
         self.start.setEnabled(False)
         self.start.clicked.connect(self.process_requested.emit)
-        form.addWidget(self.start)
+        self.cancel = QPushButton("Cancel processing")
+        self.cancel.setObjectName("Danger")
+        self.cancel.setToolTip("Stop the document being read and everything waiting behind it")
+        self.cancel.clicked.connect(self.cancel_requested.emit)
+        self.cancel.hide()
+        self.clear_list = QPushButton("Clear list")
+        self.clear_list.setToolTip("Remove every finished, failed or cancelled item from the list")
+        self.clear_list.clicked.connect(self.clear_requested.emit)
+        run_row = QHBoxLayout()
+        run_row.setSpacing(8)
+        run_row.addWidget(self.start, 1)
+        run_row.addWidget(self.cancel)
+        run_row.addWidget(self.clear_list)
+        form.addLayout(run_row)
         note = QLabel("Originals are kept as the record. Translation is only for reading.")
         note.setObjectName("CardCaption")
         note.setWordWrap(True)
@@ -241,7 +256,14 @@ class IngestPage(Page):
         for widget in (reference_label, self.reference, narrative_label):
             paste_form.addWidget(widget)
         paste_form.addWidget(self.narrative, 1)
-        paste_form.addWidget(self.submit)
+        self.clear_text = QPushButton("Clear")
+        self.clear_text.setToolTip("Empty the reference and the narrative")
+        self.clear_text.clicked.connect(self.clear_narrative)
+        submit_row = QHBoxLayout()
+        submit_row.setSpacing(8)
+        submit_row.addWidget(self.submit, 1)
+        submit_row.addWidget(self.clear_text)
+        paste_form.addLayout(submit_row)
         paste_form.addWidget(seed, 0, Qt.AlignmentFlag.AlignLeft)
         self.inputs.add_page(paste)
 
@@ -342,10 +364,12 @@ class IngestPage(Page):
         for cell, value in zip(self.pipeline.cells, values):
             cell.set(value)
 
-    def set_staged(self, count: int, busy: bool) -> None:
+    def set_staged(self, count: int, busy: bool, clearable: int = 0) -> None:
         self.drop.staged.setText(f"{count} file(s) ready to process" if count else "")
         self.start.setEnabled(bool(count) and not busy)
         self.start.setText("Processing…" if busy else "Start processing")
+        self.cancel.setVisible(busy)
+        self.clear_list.setEnabled(bool(clearable))
 
     def set_documents(self, rows: Sequence[Dict[str, object]], caption: str,
                       processing: int, failed: int, attention: int) -> None:
