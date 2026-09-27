@@ -661,6 +661,7 @@ class TestSentra(unittest.TestCase):
                 self.resize(1440, 900)
                 self.show()
                 QApplication.processEvents()
+                self.choose_portal("admin")
                 self.username.setText("mani")
                 self.password.setText(PASSWORD)
                 self.sign_in()
@@ -694,6 +695,94 @@ class TestSentra(unittest.TestCase):
         self.assertIsNone(QApplication.overrideCursor())
         self.assertFalse(any(widget.objectName() == "OpeningSplash" and widget.isVisible()
                              for widget in QApplication.topLevelWidgets()))
+
+    def _signed_in_through(self, portal: str, username: str, password: str):
+        """Sign in on the SENTRA page as a person would; returns (dialog, window)."""
+        from unittest import mock
+
+        from PyQt6.QtWidgets import QApplication
+
+        import main2
+        import sentra
+        from sif.datastore import DataStore
+        from sif.vault import Vault
+        from ui import sentra_theme
+        from ui5.login import SentraLogin
+
+        seen = {}
+
+        class Login(SentraLogin):
+            def exec(self):  # noqa: A003
+                seen["dialog"] = self
+                self.choose_portal(portal)
+                seen["prefilled"] = self.username.text()
+                self.username.setText(username)
+                self.password.setText(password)
+                self.sign_in()
+                return self.result()
+
+        def build(session, accounts):
+            window = sentra.build_window(session, accounts, datastore=DataStore(self.db_url),
+                                         vault=Vault(self.folder), probe_llm=False)
+            self.addCleanup(window.close)
+            seen["window"] = window
+            return window
+
+        with mock.patch.object(main2, "AccountStore", lambda: self.store), \
+                mock.patch.object(QApplication, "exec", lambda self_=None: 0):
+            main2.run_signed_in(QApplication.instance(), build, sentra_theme.STYLESHEET,
+                                dialog_class=Login)
+        return seen
+
+    def test_admin_login_goes_straight_to_administration(self) -> None:
+        seen = self._signed_in_through("admin", "admin", "sih165")
+        self.assertEqual(seen["prefilled"], "admin")
+        window = seen["window"]
+        self.assertEqual(window.workspace, "admin")
+        self.assertEqual(window.pages.currentIndex(), window._page_index["engines"])
+        self.assertEqual(window.session.username, "admin")
+
+    def test_hse_login_goes_straight_to_the_hse_workspace(self) -> None:
+        seen = self._signed_in_through("hse", "hse", "sih2026165")
+        self.assertEqual(seen["prefilled"], "hse")
+        window = seen["window"]
+        self.assertEqual(window.workspace, "hse")
+        self.assertEqual(window.pages.currentIndex(), window._page_index["home"])
+
+    def test_an_account_is_refused_at_the_other_login(self) -> None:
+        seen = self._signed_in_through("admin", "hse", "sih2026165")
+        self.assertNotIn("window", seen)
+        self.assertIn("HSE Login", seen["dialog"].error.text())
+        self.assertIn("sign-in refused", self._actions())
+        seen = self._signed_in_through("hse", "admin", "sih165")
+        self.assertNotIn("window", seen)
+        self.assertIn("Admin Login", seen["dialog"].error.text())
+
+    def test_the_built_in_accounts_and_their_card(self) -> None:
+        from sif.audit import AuditLog
+        from ui import sentra_theme
+        from ui5.login import SentraLogin
+
+        sentra_theme.prepare()
+        dialog = SentraLogin(self.store, AuditLog(self.audit_path), sentra_theme.STYLESHEET)
+        self.addCleanup(dialog.close)
+        self.assertEqual(dialog.page, "sign in")          # never "create the administrator"
+        self.assertEqual(self.store.get("admin").role, "admin")
+        self.assertEqual(self.store.get("hse").role, "reviewer")
+        self.assertTrue(self.store.password_matches("admin", "sih165"))
+        self.assertTrue(self.store.password_matches("hse", "sih2026165"))
+        dialog.choose_portal("admin")
+        self.assertFalse(dialog.credentials.isHidden())
+        self.assertIn("sih165", dialog.credentials_password.text())
+        dialog.fill_credentials()
+        self.assertEqual((dialog.username.text(), dialog.password.text()), ("admin", "sih165"))
+        # A changed password is never printed on the page.
+        self.store.change_password("admin", "sih165", "a much longer one")
+        dialog.choose_portal("admin")
+        self.assertTrue(dialog.credentials.isHidden())
+        # Built-in accounts are made once; an existing one is left alone.
+        self.assertFalse(self.store.ensure_builtin("admin", "X", "admin", "whatever"))
+        self.assertTrue(self.store.password_matches("admin", "a much longer one"))
 
     def test_building_the_window_does_not_import_the_learning_stack(self) -> None:
         """xgboost and MLflow are found, not imported, while the window is built."""

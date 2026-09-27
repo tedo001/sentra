@@ -113,6 +113,16 @@ class GradientPanel(QFrame):
 #: The sign-in block's width: wordmark, form and notes.
 FORM_WIDTH = 340
 
+#: The two ways in, left to right. The account decides the workspace; the
+#: choice here says which one the person means, and is checked against it.
+PORTALS = (("hse", "HSE Login"), ("admin", "Admin Login"))
+PORTAL_WORKSPACE = {"hse": "HSE workspace", "admin": "Administration"}
+
+
+def portal_of(role: str) -> str:
+    """Which sign-in an account uses: administrators Admin, everyone else HSE."""
+    return "admin" if role == "admin" else "hse"
+
 
 class SentraLogin(WorkspaceLogin):
     def _arrange(self, form: QWidget):
@@ -177,6 +187,15 @@ class SentraLogin(WorkspaceLogin):
 
     def __init__(self, store, audit, stylesheet: str = "", parent=None,
                  last_run: str = "") -> None:
+        # The two built-in accounts exist before the page is chosen, so SENTRA
+        # opens on the sign-in, never on "create the administrator".
+        from sif.accounts import BUILTIN_ACCOUNTS
+
+        for username, full_name, role, password in BUILTIN_ACCOUNTS:
+            if store.ensure_builtin(username, full_name, role, password):
+                audit.functionality("built-in account created", username=username,
+                                    role=role)
+        self.portal = "hse"
         super().__init__(store, audit, stylesheet, parent)
         for field, kind in ((self.username, "user"), (self.password, "lock"),
                             (self.forgot_name, "user"),
@@ -202,6 +221,109 @@ class SentraLogin(WorkspaceLogin):
             self.remember.setChecked(True)
         self.gradient.status.setText("●  System operational" + (
             f" · last run {last_run}" if last_run else ""))
+        self._build_portals()
+
+    # -- HSE Login / Admin Login ----------------------------------------------------------
+
+    def _build_portals(self) -> None:
+        from PyQt6.QtWidgets import QPushButton
+
+        from sif.accounts import BUILTIN_ACCOUNTS
+        from ui4.login import PAGES
+
+        layout = self.pages.widget(PAGES.index("sign in")).layout()
+        row = QHBoxLayout()
+        row.setContentsMargins(0, 0, 0, 0)
+        row.setSpacing(0)
+        self.portal_buttons = {}
+        for index, (key, label) in enumerate(PORTALS):
+            button = QPushButton(label)
+            button.setObjectName("PortalButton")
+            button.setProperty("side", "left" if index == 0 else "right")
+            button.setCheckable(True)
+            button.setCursor(Qt.CursorShape.PointingHandCursor)
+            button.clicked.connect(lambda _checked=False, portal=key: self.choose_portal(portal))
+            row.addWidget(button, 1)
+            self.portal_buttons[key] = button
+        switch = QWidget()
+        switch.setObjectName("PortalSwitch")
+        switch.setLayout(row)
+        layout.insertWidget(0, switch)
+        layout.insertSpacing(1, 16)
+
+        # The account's name and password, shown while it still has the one it
+        # was given - changed, it is nobody's business to print.
+        self.credentials = QFrame()
+        self.credentials.setObjectName("CredentialCard")
+        card = QVBoxLayout(self.credentials)
+        card.setContentsMargins(14, 10, 14, 10)
+        card.setSpacing(4)
+        top = QHBoxLayout()
+        self.credentials_title = _l("", "CredentialTitle")
+        top.addWidget(self.credentials_title)
+        top.addStretch(1)
+        self.fill_button = QPushButton("Fill in")
+        self.fill_button.setObjectName("Link")
+        self.fill_button.setFlat(True)
+        self.fill_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.fill_button.clicked.connect(self.fill_credentials)
+        top.addWidget(self.fill_button)
+        card.addLayout(top)
+        self.credentials_user = _l("", "CredentialLine")
+        self.credentials_password = _l("", "CredentialLine")
+        for label in (self.credentials_user, self.credentials_password):
+            label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+            card.addWidget(label)
+        layout.insertWidget(layout.indexOf(self.sign_in_button) + 1, self.credentials)
+        layout.insertSpacing(layout.indexOf(self.credentials), 12)
+
+        self._builtin = {portal_of(role): (username, password)
+                         for username, _name, role, password in BUILTIN_ACCOUNTS}
+        remembered = str(prefs.get("remember_username", "") or "")
+        account = self.store.get(self.store.resolve(remembered)) if remembered else None
+        self.choose_portal(portal_of(account.role) if account is not None else "hse",
+                           keep_username=account is not None)
+
+    def choose_portal(self, portal: str, keep_username: bool = False) -> None:
+        """HSE Login or Admin Login: its username filled in, its password asked for."""
+        self.portal = portal if portal in self.portal_buttons else "hse"
+        for key, button in self.portal_buttons.items():
+            button.setChecked(key == self.portal)
+        username, password = self._builtin.get(self.portal, ("", ""))
+        if not keep_username:
+            self.username.setText(username)
+        self.password.clear()
+        self._clear_error()
+        self.sign_in_button.setText(f"Sign in to {PORTAL_WORKSPACE[self.portal]}")
+        shown = bool(username) and self.store.password_matches(username, password)
+        self.credentials.setVisible(shown)
+        if shown:
+            self.credentials_title.setText(dict(PORTALS)[self.portal].upper())
+            self.credentials_user.setText(f"Username   <b>{username}</b>")
+            self.credentials_password.setText(f"Password   <b>{password}</b>")
+        self.password.setFocus()
+        self._fit_page()
+
+    def fill_credentials(self) -> None:
+        username, password = self._builtin.get(self.portal, ("", ""))
+        self.username.setText(username)
+        self.password.setText(password)
+        self.sign_in_button.setFocus()
+
+    def sign_in(self) -> None:
+        """Sign in - through the door that matches the account."""
+        name = self.username.text().strip()
+        account = self.store.get(self.store.resolve(name)) if name else None
+        if account is not None and portal_of(account.role) != self.portal and \
+                self.store.password_matches(name, self.password.text()):
+            right = dict(PORTALS)[portal_of(account.role)]
+            self.audit.functionality("sign-in refused", attempted=account.username,
+                                     reason=f"wrong sign-in - uses {right}")
+            self.password.clear()
+            self._fail(f"{account.full_name} signs in through {right}. "
+                       f"Choose {right} above.")
+            return
+        super().sign_in()
 
     def _fit_page(self, _current: int = -1) -> None:
         """The page stack as tall as the page on show (a stack keeps its tallest)."""

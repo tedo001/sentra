@@ -194,22 +194,39 @@ Every menu and drop-down list opens white with dark text wherever it is opened
 from, including the dark title row, and a test measures the rendered pop-up so
 it cannot turn transparent (black on Windows) again.
 
-## Sign-in and a record of who did what
+## Sign-in: HSE Login and Admin Login
 
 | | |
 | --- | --- |
-| ![Sign in](docs/sentra-signin.png) | ![Forgot password](docs/sentra-forgot.png) |
+| ![Admin Login](docs/sentra-signin.png) | ![Forgot password](docs/sentra-forgot.png) |
 
-* **No default password.** The first start on a machine creates the
-  administrator; everyone else is created on *New HSE Login* and signs in by
-  username or email with a one-time password they must change.
+The sign-in page has two ways in, side by side: **HSE Login** and **Admin
+Login**. Choosing one fills in its username and shows its credentials; enter the
+password and SENTRA opens **directly** in that workspace.
+
+| Login | Username | Password | Opens |
+| --- | --- | --- | --- |
+| **Admin Login** | `admin` | `sih165` | Administration - Engines, Settings, SysLog, Audit Log, New HSE Login, Data & Backup, Profile |
+| **HSE Login** | `hse` | `sih2026165` | HSE workspace - Home, Ingest, Dashboard, HSE Review, Action Items, Risk Hotspots, Asset Memory, Profile |
+
+* Both accounts are created the first time SENTRA starts, so it opens on the
+  sign-in, never on a "create the administrator" page.
+* An account can only come in through its own door: the HSE account is refused
+  at Admin Login and the administrator at HSE Login, with a message saying
+  which to use, and the refusal is written to the audit log.
+* **Change both passwords before real use** (*Profile → Change password*). The
+  credentials box on the sign-in page is shown only while an account still has
+  its original password, so a changed password is never printed. New
+  passwords need at least 8 characters; the two built-in ones are exempt only
+  until they are changed.
+* More accounts are created on *New HSE Login*; an administrator account signs
+  in through Admin Login, everyone else through HSE Login.
 * **Forgot password?** Beside *Remember Me*. There is no mail service to send
   a link, so the request goes where a reset can actually happen: it is written
   to the audit log, the administrator's bell counts it (and opens *New HSE
   Login*), and the account is marked **Reset requested** until a one-time
   password is issued, which the person replaces at their next sign-in. The
-  reply is the same whether or not the account exists, so the page cannot be
-  used to find out who has one.
+  reply is the same whether or not the account exists.
 * **Passwords are never stored** — a salted PBKDF2-HMAC-SHA256 digest at 600,000
   iterations. Five wrong attempts lock an account for five minutes.
 * **Every record names its person.** Each analysed report says who analysed it,
@@ -294,8 +311,8 @@ python sentra.py            # SENTRA
 python sentra.py --present  # everything 1.5x larger - for screenshots on slides
 ```
 
-On first start SENTRA asks for the administrator account. Sign in as the
-administrator to create HSE logins; sign in as an HSE Analyst to work. Load
+Sign in with **Admin Login** (`admin` / `sih165`) or **HSE Login** (`hse` /
+`sih2026165`) - see *Sign-in* above. Load
 `samples/near_miss_reports.csv` on **Ingest** for a demo corpus of 18 reports.
 
 The first run downloads the sentence-transformer (~90 MB); the window stays
@@ -313,6 +330,9 @@ trail, review decisions, the compliance calendar, `sentra.db`, the vault and
 the preferences.
 
 ### Build the Windows installer yourself (SENTRA.exe + setup wizard)
+
+**Full instructions - building, testing, updating to a new version, silent
+installs, troubleshooting: [INNO.md](INNO.md).** In short:
 
 On Windows, in a PyCharm terminal (PowerShell) opened in the project folder:
 
@@ -556,7 +576,7 @@ git tag -a v2.1.0 -m "..." && git push origin v2.1.0
 | `test_app4.py` | 37 tests: the two workspaces, their tabs and permissions, every page. |
 | `test_actions.py`, `test_present.py` | 21 tests: the compliance calendar and the presentation helpers. |
 | `test_asset_memory.py` | 16 tests: the map's gazetteer, assets and report kinds, every memory signal, the time window, corrective actions that did not hold, and every recommendation rule including a reviewer's decision. |
-| `test_sentra.py` | 30 tests: no score of 100, the map placing sites and a click choosing one, the decision trail, clear and cancel (including cancelling a running analysis), dates with their zone, the Asset Memory tab, holds leading Home and HSE Review and audited once, the case panels, a rejection releasing a hold, the memory and holds in the database; SENTRA's pages, gemma2 always on and who may switch it off, the database written and reloaded, sync, similar-report search, backup / verify / restore, scheduled backups, the sign-in's alignment, forgot password end to end, menus measured as opaque white, and nothing leaking into app4. |
+| `test_sentra.py` | 36 tests: Admin Login and HSE Login each opening their workspace, an account refused at the other login, the built-in accounts and their credentials box, the sign-in staying on screen until the console opens, no score of 100, the map placing sites and a click choosing one, the decision trail, clear and cancel (including cancelling a running analysis), dates with their zone, the Asset Memory tab, holds leading Home and HSE Review and audited once, the case panels, a rejection releasing a hold, the memory and holds in the database; SENTRA's pages, gemma2 always on and who may switch it off, the database written and reloaded, sync, similar-report search, backup / verify / restore, scheduled backups, the sign-in's alignment, forgot password end to end, menus measured as opaque white, and nothing leaking into app4. |
 | `test_sentra_data.py` | 18 tests: the SQL store, the vector index, the vault, the archive and its tamper checks, AWS SigV4 against the suite's own vectors, and the folder, S3 and WebDAV targets against local servers that verify each request. |
 | `sample_reports.csv` | Six mock rows for the batch-import demo. |
 | `samples/` | Test material for every ingestion path - an 18-report CSV, a shift log, a text-layer PDF, a scan with no text layer, and reports in five Indian languages. See `samples/README.md`. |
@@ -759,7 +779,7 @@ On a headless machine prefix with `QT_QPA_PLATFORM=offscreen`, and with
 `SIF_ENCODER=hashing` to pin the offline encoder so the run needs no model
 download and is deterministic.
 
-**452 tests.** They cover every pipeline stage and the fusion guards, the MLOps
+**456 tests.** They cover every pipeline stage and the fusion guards, the MLOps
 round-trip, document extraction and the OCR model cache, the local LLM's
 readiness and model-name handling, the review bench and its decision trail, the
 update checker and the release pipeline, sign-in, roles and the audit chain, the

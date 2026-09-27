@@ -24,6 +24,8 @@ VERSION_FILE = pathlib.Path(__file__).resolve().parent.parent / "sif" / "version
 #: from its own window - which passes no /DAppVersion and would otherwise build
 #: an installer that reports 0.0.0.
 INSTALLER_FILE = pathlib.Path(__file__).resolve().parent / "installer.iss"
+#: SENTRA's own setup script carries the same fallback line.
+SENTRA_INSTALLER_FILE = pathlib.Path(__file__).resolve().parent / "sentra_installer.iss"
 INSTALLER_LINE = re.compile(r'(?m)^(  #define AppVersion ")[^"]+(")$')
 SEMVER = re.compile(r"^v?\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$")
 
@@ -72,6 +74,10 @@ def main(argv=None) -> int:
     if fallback is not None:
         INSTALLER_FILE.write_text(
             INSTALLER_LINE.sub(rf'\g<1>{version}\g<2>', installer), encoding="utf-8")
+    if SENTRA_INSTALLER_FILE.exists():
+        sentra = SENTRA_INSTALLER_FILE.read_text(encoding="utf-8")
+        SENTRA_INSTALLER_FILE.write_text(
+            INSTALLER_LINE.sub(rf'\g<1>{version}\g<2>', sentra), encoding="utf-8")
 
     print(f"stamped {version}" + (f"+{args.build}" if args.build else ""))
     return 0

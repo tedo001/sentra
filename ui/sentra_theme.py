@@ -299,6 +299,18 @@ QComboBox QAbstractItemView, QFrame#WorkspaceHeader QComboBox QAbstractItemView 
     selection-background-color: #EFF6FF; selection-color: {NAVY};
 }}
 QComboBox QAbstractItemView::item:hover {{ background-color: #EFF6FF; }}
+QPushButton#PortalButton {{
+    background: #FFFFFF; color: {G[700]}; border: 1px solid {G[300]}; padding: 9px 0;
+    font-size: 13px; font-weight: 600;
+}}
+QPushButton#PortalButton[side="left"] {{ border-top-left-radius: 4px; border-bottom-left-radius: 4px; border-right: none; }}
+QPushButton#PortalButton[side="right"] {{ border-top-right-radius: 4px; border-bottom-right-radius: 4px; }}
+QPushButton#PortalButton:hover {{ background: {G[50]}; }}
+QPushButton#PortalButton:checked {{ background: {NAVY}; color: #FFFFFF; border-color: {NAVY}; }}
+QFrame#CredentialCard {{ background: #EFF6FF; border: 1px solid #BFDBFE; border-radius: 6px; }}
+QFrame#CredentialCard QLabel {{ background: transparent; }}
+QLabel#CredentialTitle {{ font-family: {MONO}; font-size: 11px; letter-spacing: 1px; color: {NAVY}; font-weight: 600; }}
+QLabel#CredentialLine {{ font-family: {MONO}; font-size: 12px; color: {G[800]}; }}
 QLabel#GradientStatus {{
     font-family: {MONO}; font-size: 12px; color: rgba(255,255,255,0.7);
     background: rgba(255,255,255,0.10); border: 1px solid rgba(255,255,255,0.20);

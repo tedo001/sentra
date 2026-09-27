@@ -60,7 +60,7 @@ from . import prefs
 __all__ = [
     "ROLES", "ROLE_LABELS", "PERMISSIONS", "VIEW", "ANALYSE", "DECIDE", "TRAIN",
     "CLEAR", "CONFIGURE", "MANAGE_USERS", "Account", "Session", "AccountStore",
-    "AuthError", "accounts_file_path", "temporary_password",
+    "AuthError", "accounts_file_path", "temporary_password", "BUILTIN_ACCOUNTS",
 ]
 
 LOGGER = logging.getLogger(__name__)
@@ -109,6 +109,15 @@ PERMISSION_WORDS: Dict[str, str] = {
 ITERATIONS = 600_000
 SALT_BYTES = 16
 MIN_PASSWORD = 8
+
+#: The sign-in accounts SENTRA creates on first start: (username, full name,
+#: role, password). "reviewer" is the HSE Analyst role. Change the passwords
+#: before real use - Profile > Change password - and the sign-in page stops
+#: showing them.
+BUILTIN_ACCOUNTS = (
+    ("admin", "Administrator", "admin", "sih165"),
+    ("hse", "HSE Analyst", "reviewer", "sih2026165"),
+)
 #: This many wrong passwords in a row locks the account for LOCKOUT_MINUTES.
 MAX_FAILURES = 5
 LOCKOUT_MINUTES = 5
@@ -440,6 +449,34 @@ class AccountStore:
         if not others:
             raise AuthError("This is the last active administrator. Make someone "
                             "else an administrator first.", "last admin")
+
+    def ensure_builtin(self, username: str, full_name: str, role: str,
+                       password: str) -> bool:
+        """Create a built-in account if it is not there yet; True when created.
+
+        The two sign-in accounts SENTRA ships with (see
+        :data:`sif.accounts.BUILTIN_ACCOUNTS`) are created with the passwords
+        the project was given, which may be shorter than the rule for new
+        accounts; every other account, and every password change, still has to
+        meet it. An existing account of that name is left exactly as it is.
+        """
+        username = username.strip().lower()
+        with self._lock:
+            if username in self._accounts:
+                return False
+            account = Account(username=username, full_name=" ".join(full_name.split()),
+                              role=role, iterations=self.iterations,
+                              created_at=_now().isoformat(), created_by="built-in")
+            self._set_secret(account, password)
+            self._accounts[username] = account
+            self.save()
+        LOGGER.info("Built-in account %s created (%s)", username, role)
+        return True
+
+    def password_matches(self, username: str, password: str) -> bool:
+        """Does ``password`` open ``username``? No attempt is counted, nothing changes."""
+        account = self._accounts.get(self.resolve(username))
+        return bool(account is not None and self._matches(account, password))
 
     @staticmethod
     def _check_password(password: str, username: str) -> None:

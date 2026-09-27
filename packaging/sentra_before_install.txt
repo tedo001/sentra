@@ -12,8 +12,10 @@ WHERE YOUR DATA LIVES
   in %APPDATA%\SIF Insight Console - not in the program folder. Uninstalling
   SENTRA does not delete them.
 
-  The first time SENTRA starts on this computer it asks you to create the
-  administrator account. There is no default password.
+  SIGNING IN
+    Admin Login   username admin   password sih165       -> Administration
+    HSE Login     username hse     password sih2026165   -> HSE workspace
+  Change both passwords before real use: Profile > Change password.
 
 FONTS
   Inter, JetBrains Mono and IBM Plex are included under the SIL Open Font
