@@ -18,6 +18,8 @@ from main2 import ExtractionWorker, requires
 from sif import SEED_REPORTS
 from sif import prefs
 from sif.accounts import ANALYSE, DECIDE
+from sif.langdetect import detect_language
+from sif.segment import split_reports
 from sif.llm import looks_non_latin
 from sif.ocr import IMAGE_SUFFIXES, PDF_SUFFIXES
 from sif.review import fingerprint
@@ -36,6 +38,46 @@ __all__ = ["HSEPages"]
 #: Critical, by the design's cut: a score at or above this is "Critical".
 CRITICAL = 85.0
 
+
+
+def languages_in(texts: List[str]) -> List[str]:
+    """The languages other than English these texts are written in, in order."""
+    found: List[str] = []
+    for text in texts:
+        detected = detect_language(text)
+        if detected.code and not detected.english and detected.label not in found:
+            found.append(detected.label)
+    return found
+
+
+def language_column(languages: List[str], translated: Optional[int] = None,
+                    foreign: int = 0, glossed: int = 0) -> str:
+    """The Ingest table's Language cell.
+
+    Read: 'Hindi' ('Mixed: Hindi, Tamil' for several). Analysed: whether the
+    translation really happened - 'Hindi → English', 'Hindi → English (2 of 3)'
+    or 'Hindi · not translated'; 'Hindi · keyword gloss' when, with no LLM,
+    the engines read an English gloss of the report's safety terms.
+    """
+    if not languages:
+        return "English"
+    names = [name.split(" /")[0] for name in languages]
+    # The column is narrow: two names fit, more are counted (the detail pane
+    # and the processing log name every one).
+    name = ", ".join(names) if len(names) <= 2 else f"{len(names)} languages"
+    if translated is None or not foreign:
+        return name
+    if translated >= foreign:
+        return f"{name} \u2192 English"
+    if translated and glossed and translated + glossed >= foreign:
+        return f"{name} \u2192 English ({translated}) + gloss ({glossed})"
+    if translated:
+        return f"{name} \u2192 English ({translated} of {foreign})"
+    if glossed >= foreign:
+        return f"{name} \u00b7 keyword gloss"
+    if glossed:
+        return f"{name} \u00b7 gloss ({glossed} of {foreign})"
+    return f"{name} \u00b7 not translated"
 
 class HSEPages:
     """Home, Ingest, Dashboard, HSE Review, Risk Hotspots, Profile - the design's."""
@@ -703,7 +745,7 @@ class IngestFlow:
 
     @requires(ANALYSE)
     def submit_narrative(self, text: str, reference: str = "") -> None:
-        blocks = [block.strip() for block in text.split("\n\n") if block.strip()]
+        blocks = split_reports(text)
         if not blocks:
             return
         item = self._new_item("Pasted narrative", "paste")
@@ -845,11 +887,11 @@ class IngestFlow:
         item["ocr"] = ("Not needed" if backend in ("text", "plain text") else
                        f"{backend}" + (f" \u00b7 conf {float(confidence) * 100:.0f}%"
                                        if isinstance(confidence, (int, float)) and confidence else ""))
-        non_english = looks_non_latin(text)
-        item["language"] = (f"{self.language.split(' /')[0]} \u2192 English"
-                            if non_english and self.translate_enabled
-                            else self.language.split(" /")[0] if non_english else "English")
-        self._log(item, f"read via {backend}: {len(text)} characters, {len(blocks)} block(s)")
+        item["languages"] = languages_in(blocks or [text])
+        item["language"] = language_column(item["languages"])
+        self._log(item, f"read via {backend}: {len(text)} characters, {len(blocks)} report(s)")
+        self._log(item, "language: " + (", ".join(item["languages"]) if item["languages"]
+                                         else "English"))
         if not blocks:
             item["state"], item["stage"] = "attention", "Extract"
             item["note"] = "no readable text"
@@ -876,16 +918,28 @@ class IngestFlow:
             index, row = self._row_for(reference)
             if row is not None and not row.get("source"):
                 row["source"] = item["name"]
-        translated = [row for row in self.rows if str(row.get("reference")) in references
-                      and row.get("translated_text")]
-        if translated:
-            item["translated"] = "\n\n".join(str(row["translated_text"]) for row in translated)
-        if not item.get("language"):
-            produced = [row for row in self.rows if str(row.get("reference")) in references]
-            foreign = any(looks_non_latin(str(row.get("raw_text", ""))) for row in produced)
-            name = self.language.split(" /")[0]
-            item["language"] = ((f"{name} \u2192 English" if translated else name)
-                                if foreign else "English")
+        rendered = [row for row in self.rows if str(row.get("reference")) in references
+                    and (row.get("translated_text") or row.get("gloss"))]
+        if rendered:
+            item["translated"] = "\n\n".join(str(row.get("translated_text") or row.get("gloss"))
+                                              for row in rendered)
+        translated = [row for row in rendered if row.get("translated_text")]
+        glossed = [row for row in rendered if not row.get("translated_text")]
+        # What each report turned out to be, and whether it really was translated.
+        produced = [row for row in self.rows if str(row.get("reference")) in references]
+        foreign = [row for row in produced if row.get("source_language")]
+        item["languages"] = languages_in(
+            [str(row.get("raw_text") or "") for row in produced]) or item.get("languages") or []
+        item["language"] = language_column(item["languages"], len(translated), len(foreign),
+                                           len(glossed))
+        if glossed:
+            self._log(item, f"{len(glossed)} of {len(foreign)} non-English report(s) read "
+                            "through an English keyword gloss - the local LLM did not "
+                            "translate them; the original is the record")
+        untouched = len(foreign) - len(translated) - len(glossed)
+        if foreign and untouched > 0:
+            self._log(item, f"{untouched} of {len(foreign)} non-English report(s) analysed as "
+                            "written - no translation and no safety term the gloss knows")
         self._log(item, f"analysed: {count} report(s)")
 
     # -- the page ------------------------------------------------------------------------
@@ -901,10 +955,21 @@ class IngestFlow:
             return
         item = self.ingest_items[self._ingest_selected]
         caption, text = "", str(item.get("text") or "")
-        if item.get("translated"):
-            caption = (f"ENGLISH \u2014 TRANSLATED FROM {self.language.split(' /')[0].upper()} "
+        glossed_only = "gloss" in str(item.get("language")) and "\u2192" not in str(
+            item.get("language"))
+        if item.get("translated") and glossed_only:
+            names = ", ".join(name.split(" /")[0] for name in item.get("languages") or [])
+            caption = (f"{names.upper()} \u00b7 as written \u00b7 no LLM translation - the "
+                       "engines read the English keyword gloss below it")
+            text = text.rstrip() + "\n\n\u2014\n" + str(item["translated"])
+        elif item.get("translated"):
+            names = [name.split(" /")[0] for name in item.get("languages") or []] or ["the original"]
+            caption = (f"ENGLISH \u2014 TRANSLATED FROM {', '.join(names).upper()} "
                        "FOR REVIEW \u00b7 original kept as the record")
             text = str(item["translated"])
+        elif item.get("languages"):
+            names = ", ".join(name.split(" /")[0] for name in item["languages"])
+            caption = f"{names.upper()} \u00b7 as written"
         elif item["kind"] == "csv":
             caption = f"CSV EXPORT \u00b7 {item.get('pages')} \u00b7 each row analysed as a report"
             refs = item.get("references") or []
@@ -953,13 +1018,19 @@ class IngestFlow:
         ocr_active = sum(1 for item in self.ingest_items
                          if item["state"] == "processing" and item["stage"] == "OCR")
         held = attention + sum(1 for item in self.ingest_items if item["state"] == "extracted")
-        untranslated = sum(1 for row in self.rows if looks_non_latin(str(row.get("raw_text", "")))
-                           and not row.get("translated_text"))
+        foreign = [row for row in self.rows if looks_non_latin(str(row.get("raw_text", "")))]
+        translated = sum(1 for row in foreign if row.get("translated_text"))
+        glossed = sum(1 for row in foreign if row.get("gloss") and not row.get("translated_text"))
+        as_written = len(foreign) - glossed - translated
+        translate_cell = " · ".join(part for part in (
+            f"{translated} translated" if translated else "",
+            f"{glossed} gloss" if glossed else "",
+            f"{as_written} as written" if as_written else "") if part) or "none needed"
         running = sum(1 for item in self.ingest_items
                       if item["state"] == "processing" and item["stage"] == "Analyse")
         page.set_pipeline((f"{len(self.ingest_items)} received",
                            f"{ocr_active} active / {failed} failed",
-                           f"{held} held", f"{untranslated} pending", f"{running} running",
+                           f"{held} held", translate_cell, f"{running} running",
                            f"{self.outstanding_reviews} awaiting a person"))
         page.set_engines(self._engine_line())
         self._show_ingest_detail()

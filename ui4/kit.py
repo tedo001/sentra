@@ -397,6 +397,13 @@ class _CellDelegate(QStyledItemDelegate):
         super().__init__(table)
         self.table = table
 
+    def initStyleOption(self, option: QStyleOptionViewItem, index) -> None:
+        super().initStyleOption(option, index)
+        # References and file names differ at the end ("multilingual_report-03"),
+        # so a narrow column keeps both ends and drops the middle.
+        if (index.data(ROLE_KIND) or "text") == "mono":
+            option.textElideMode = Qt.TextElideMode.ElideMiddle
+
     def paint(self, painter: QPainter, option: QStyleOptionViewItem, index) -> None:
         kind = index.data(ROLE_KIND) or "text"
         if kind in ("text", "strong", "mono", "muted", "num"):
@@ -417,7 +424,9 @@ class _CellDelegate(QStyledItemDelegate):
             painter.setFont(font)
             painter.setPen(QColor(NAVY))
             painter.drawText(rect, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft,
-                             str(index.data(Qt.ItemDataRole.DisplayRole) or ""))
+                             QFontMetrics(font).elidedText(
+                                 str(index.data(Qt.ItemDataRole.DisplayRole) or ""),
+                                 Qt.TextElideMode.ElideMiddle, rect.width()))
         elif kind == "pill" and payload:
             text, tone = payload
             fill, ink, border = TONES.get(tone, TONES["grey"])

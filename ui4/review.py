@@ -28,6 +28,8 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from sif.langdetect import detect_language
+
 from .kit import Card, Col, DesignTable, Page, Pill, clear_layout, scrolling
 
 __all__ = ["CASE_COLUMNS", "CaseView", "FILTERS", "ReviewPage", "reasoning", "evidence_rows"]
@@ -51,6 +53,19 @@ def _l(text: str, name: str, wrap: bool = True) -> QLabel:
     label.setWordWrap(wrap)
     label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
     return label
+
+
+def _language_of(row: Dict[str, object]) -> str:
+    """The report's language by name - 'Hindi' - or '' for English.
+
+    Read from the row, or from the text itself for rows filed before the
+    language was recorded.
+    """
+    named = str(row.get("source_language") or "").split(" /")[0].strip()
+    if named:
+        return named
+    detected = detect_language(str(row.get("raw_text") or ""))
+    return "" if detected.english or not detected.code else detected.name
 
 
 def evidence_rows(row: Dict[str, object]) -> List[Tuple[str, str]]:
@@ -216,13 +231,21 @@ class CaseView(QWidget):
 
     def _toggle_original(self, original: bool) -> None:
         row = self._row
-        translated = str(row.get("translated_text") or "")
+        gloss = not row.get("translated_text") and bool(row.get("gloss"))
+        translated = str(row.get("translated_text") or row.get("gloss") or "")
         self.text.setText(str(row.get("raw_text") or "") if original or not translated
                           else translated)
-        self.original_button.setText("Show the translation" if original else "Show the original")
-        language = str(row.get("source_language") or "the original").split(" /")[0]
-        self.text_tag.setText(f"ORIGINAL · {language.upper()}" if original else
-                              f"ENGLISH — TRANSLATED FROM {language.upper()}")
+        self.original_button.setText(
+            ("Show the keyword gloss" if gloss else "Show the translation") if original
+            else "Show the original")
+        language = _language_of(row) or "the original"
+        if original:
+            self.text_tag.setText(f"ORIGINAL · {language.upper()}")
+        elif gloss:
+            self.text_tag.setText(f"ENGLISH KEYWORD GLOSS OF THE {language.upper()} — "
+                                  "NOT A TRANSLATION")
+        else:
+            self.text_tag.setText(f"ENGLISH — TRANSLATED FROM {language.upper()}")
 
     def show_case(self, row: Optional[Dict[str, object]], *, status: Tuple[str, str] = ("", ""),
                   meta: str = "", waiting: str = "") -> None:
@@ -266,16 +289,24 @@ class CaseView(QWidget):
         for column in range(3):
             self.facts.setColumnStretch(column, 1)
 
-        translated = bool(row.get("translated_text"))
+        translated = bool(row.get("translated_text") or row.get("gloss"))
         self.original_button.setVisible(translated)
         self.original_button.blockSignals(True)
         self.original_button.setChecked(False)
         self.original_button.blockSignals(False)
         if translated:
-            self._toggle_original(False)
+            # A gloss is a list of terms, not something to read the case from:
+            # the original is shown first and the gloss is a click away.
+            gloss = not row.get("translated_text")
+            self.original_button.blockSignals(True)
+            self.original_button.setChecked(gloss)
+            self.original_button.blockSignals(False)
+            self._toggle_original(gloss)
         else:
             self.text.setText(str(row.get("raw_text") or ""))
-            self.text_tag.setText("ENGLISH AS WRITTEN")
+            language = _language_of(row)
+            self.text_tag.setText(f"{language.upper()} AS WRITTEN · NOT TRANSLATED"
+                                  if language else "ENGLISH AS WRITTEN")
 
         clear_layout(self.cues)
         cues = evidence_rows(row) or [("No cue matched", "the engine found nothing to quote")]

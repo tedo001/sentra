@@ -45,8 +45,8 @@ DOCUMENT_COLUMNS = (
     Col("name", "File / source", 0, "mono"),
     Col("type", "Type", 62),
     Col("pages", "Pages", 84, align="right"),
-    Col("language", "Language", 150),
-    Col("ocr", "OCR", 160),
+    Col("language", "Language", 190),
+    Col("ocr", "OCR", 130),
     Col("stage", "Stage", 86),
     Col("status", "Status", 190, "pill"),
 )
@@ -183,8 +183,10 @@ class IngestPage(Page):
         self.drop.choose_requested.connect(self._choose)
         self.drop.files_dropped.connect(self.files_chosen.emit)
         form.addWidget(self.drop)
-        language_label = QLabel("OCR language")
+        language_label = QLabel("OCR language (scanned pages)")
         language_label.setObjectName("FieldLabel")
+        language_label.setToolTip("Which recogniser reads scanned pages and images. "
+                                  "The language of a text is detected from the text itself.")
         self.language = QComboBox()
         for name in languages:
             self.language.addItem(name)
@@ -222,11 +224,13 @@ class IngestPage(Page):
         self.clear_list = QPushButton("Clear list")
         self.clear_list.setToolTip("Remove every finished, failed or cancelled item from the list")
         self.clear_list.clicked.connect(self.clear_requested.emit)
+        # Start takes the full width; Cancel and Clear list share the row under
+        # it, so no label is clipped in the 342 px card.
+        form.addWidget(self.start)
         run_row = QHBoxLayout()
         run_row.setSpacing(8)
-        run_row.addWidget(self.start, 1)
-        run_row.addWidget(self.cancel)
-        run_row.addWidget(self.clear_list)
+        run_row.addWidget(self.cancel, 1)
+        run_row.addWidget(self.clear_list, 1)
         form.addLayout(run_row)
         note = QLabel("Originals are kept as the record. Translation is only for reading.")
         note.setObjectName("CardCaption")

@@ -16,7 +16,13 @@ operator's accounts, audit trail and review decisions are not orphaned.
 ![SENTRA dashboard](docs/sentra-dashboard.png)
 
 *The HSE Dashboard: five headline figures, SIF exposure by IOGP rule, failed
-barrier controls, the latest reports and the weekly risk trend.*
+barrier controls, the latest reports, the risk trend up to now (today, week,
+month, year) and the risk-profile spider chart.*
+
+![Risk trend and risk profile](docs/sentra-dashboard-trend.png)
+
+*The risk trend, here the last 12 months month by month, and beside it the
+risk profile: the same reports as a spider chart by IOGP rule.*
 
 > **Start here:** [USING_SENTRA.md](USING_SENTRA.md) — the click-by-click flow,
 > from first launch to working the review queue.
@@ -55,7 +61,7 @@ barrier controls, the latest reports and the weekly risk trend.*
 | ![Home](docs/sentra-home.png) | ![Ingest](docs/sentra-ingest.png) |
 | **Home** — what needs you now: critical cases oldest first, open cases by trigger, recent incidents and your recent activity. | **Ingest** — CSV exports, PDFs, scans and photographs, or a pasted narrative, through OCR, extraction, translation and analysis, with a log per document. |
 | ![Dashboard](docs/sentra-dashboard.png) | ![HSE Review](docs/sentra-review.png) |
-| **Dashboard** — last 30 / 90 days or 12 months, by site and activity: SIF exposure by rule, failed barriers, recent reports and the weekly trend (line or bar). | **HSE Review** — the case list beside the case: the work-hold recommendation, engine assessment (not a decision), the report in English, the asset's memory, the report's decision history, evidence and reasoning, and three keys to decide it. **Decision trail** switches to every decision recorded, standing or superseded, filterable by reviewer and decision, exportable. |
+| **Dashboard** — last 30 / 90 days or 12 months, by site and activity: SIF exposure by rule, failed barriers and recent reports; the **risk trend up to now** — *Today* hour by hour, *Week* and *Month* day by day, *Year* month by month, or *All* — as line or bar; and beside it the **risk profile**, a spider chart of the same reports by IOGP rule, energy source or failed barrier. | **HSE Review** — the case list beside the case: the work-hold recommendation, engine assessment (not a decision), the report in English, the asset's memory, the report's decision history, evidence and reasoning, and three keys to decide it. **Decision trail** switches to every decision recorded, standing or superseded, filterable by reviewer and decision, exportable. |
 | ![Action Items](docs/sentra-actions.png) | ![Risk Hotspots](docs/sentra-hotspots.png) |
 | **Action Items** — the compliance calendar: recurring and corrective HSE work by category, month or week, with what is due next. | **Risk Hotspots** — an interactive map of the Upper Assam operating area: each site at its locality, sized by reports and coloured by SIF-precursor density (Wilson lower bound); hover for figures, click to choose, scroll to zoom, drag to pan. Beside it the ranked table; below, the chosen site's incidents, activities and barrier failures. |
 | ![Asset Memory](docs/sentra-assets.png) | ![Decision trail](docs/sentra-trail.png) |
@@ -162,8 +168,19 @@ A recommendation is advice to a person, never an order:
   zone chosen in *Settings* (Asia/Kolkata by default) and names the zone:
   `25 Sep 2026, 14:06 IST`. A report's own date is a calendar date and is never
   shifted. The dashboard says when it was updated, the recent reports say when
-  each was reported, the weekly trend names its weeks with the year, and a
-  review case says when the report was made and when it was analysed.
+  each was reported, the risk trend names each hour, day or month in its
+  tooltip, and a review case says when the report was made and when it was
+  analysed. A report's own date is read off the form ("Date: 14-09-2026",
+  "दिनांक: 18-09-2026", "তাৰিখ: ১৬-০৯-২০২৬") so the trend puts it on its day.
+* **The risk trend is up to date.** Its range runs back from *now*: *Today*
+  by the hour (a report dated today with no time is counted and named, not
+  drawn at midnight), *Week* and *Month* by the day, *Year* by the month, *All*
+  by whichever unit keeps the chart readable. Counts are drawn as straight
+  lines on whole-number axes, and the peaks, the average and the total sit
+  beneath it. The **risk profile** beside it is a spider chart of the same
+  reports: all reports, SIF potential and critical, on one scale, on fixed
+  axes (11 IOGP rules, 9 energy sources or 12 barriers) so one month's shape
+  can be compared with the next; hover a spoke for its figures.
 * **No score of 100.** The risk score is capped at 95 and P(SIF) at 0.95: a
   machine reading of free text is never certain. The critical band starts at
   85, so no report's band, queue place or recommendation changes.
@@ -549,6 +566,9 @@ git tag -a v2.1.0 -m "..." && git push origin v2.1.0
 | `sif/actions.py` | The compliance calendar: recurring and corrective actions and who closed each date. |
 | `sif/llm.py` | The Ollama client: readiness, translation and the fourth opinion. |
 | `sif/pipeline.py` | `SIFPipeline` — orchestration, `PipelineResult`, corpus `Intelligence`. |
+| `sif/langdetect.py` | Which language a report is in, from its own letters: script first, then marker letters and common words for languages that share one. |
+| `sif/segment.py` | Where one report ends and the next begins: letterheads, "Immediate action:" paragraphs, separator lines; and the date a form gives itself. |
+| `sif/glossary.py` | The English keyword gloss of a report in an Indian language, for the engines when no LLM translates; and Oil India's sites as the scripts write them. |
 | `sif/ocr.py` | `DocumentExtractor` — plain text, PDF text layer, PaddleOCR for scans; per-line OCR confidence. Also the model cache: one engine per language for the life of the process, a disk check so a downloaded model is never re-announced as pending, and `python -m sif.ocr` to fetch them once. |
 | `sif/mlops.py` | Features, `SIFModel` (XGBoost), `MLflowTracker`, `MLOpsService`. |
 | `sif/logging_setup.py` | Rotating file + in-memory ring buffer behind the Settings log view. |
@@ -574,12 +594,14 @@ git tag -a v2.1.0 -m "..." && git push origin v2.1.0
 | `test_functional.py` | 65 end-to-end tests: the windows driven against the real `samples/` files, from import through review to a trained model, plus the skins measured off the rendered pixels. |
 | `test_access.py` | 32 tests: sign-in, roles, lockout, one-time passwords and the audit chain. |
 | `test_app4.py` | 37 tests: the two workspaces, their tabs and permissions, every page. |
-| `test_actions.py`, `test_present.py` | 21 tests: the compliance calendar and the presentation helpers. |
+| `test_actions.py`, `test_present.py` | 27 tests: the compliance calendar and the presentation helpers, including the risk trend's hour, day and month buckets up to now and the spider chart's counts. |
 | `test_asset_memory.py` | 16 tests: the map's gazetteer, assets and report kinds, every memory signal, the time window, corrective actions that did not hold, and every recommendation rule including a reviewer's decision. |
-| `test_sentra.py` | 36 tests: Admin Login and HSE Login each opening their workspace, an account refused at the other login, the built-in accounts and their credentials box, the sign-in staying on screen until the console opens, no score of 100, the map placing sites and a click choosing one, the decision trail, clear and cancel (including cancelling a running analysis), dates with their zone, the Asset Memory tab, holds leading Home and HSE Review and audited once, the case panels, a rejection releasing a hold, the memory and holds in the database; SENTRA's pages, gemma2 always on and who may switch it off, the database written and reloaded, sync, similar-report search, backup / verify / restore, scheduled backups, the sign-in's alignment, forgot password end to end, menus measured as opaque white, and nothing leaking into app4. |
+| `test_sentra.py` | 40 tests: a Hindi file labelled Hindi and read through the keyword gloss, the fourteen mock PDFs through the window, the Ingest buttons unclipped, the risk trend's Today / Week / Month / Year and the spider chart's three views, Admin Login and HSE Login each opening their workspace, an account refused at the other login, the built-in accounts and their credentials box, the sign-in staying on screen until the console opens, no score of 100, the map placing sites and a click choosing one, the decision trail, clear and cancel (including cancelling a running analysis), dates with their zone, the Asset Memory tab, holds leading Home and HSE Review and audited once, the case panels, a rejection releasing a hold, the memory and holds in the database; SENTRA's pages, gemma2 always on and who may switch it off, the database written and reloaded, sync, similar-report search, backup / verify / restore, scheduled backups, the sign-in's alignment, forgot password end to end, menus measured as opaque white, and nothing leaking into app4. |
+| `test_languages.py` | 27 tests: every language sample named from its text, Hindi told from Marathi and Assamese from Bengali, report forms kept whole and logs split, the date on a form, the keyword gloss (negation, word boundaries, Indian digits, joiners), sites in Indian scripts, and all fourteen mock PDFs read with the right language and verdict. |
 | `test_sentra_data.py` | 18 tests: the SQL store, the vector index, the vault, the archive and its tamper checks, AWS SigV4 against the suite's own vectors, and the folder, S3 and WebDAV targets against local servers that verify each request. |
 | `sample_reports.csv` | Six mock rows for the batch-import demo. |
-| `samples/` | Test material for every ingestion path - an 18-report CSV, a shift log, a text-layer PDF, a scan with no text layer, and reports in five Indian languages. See `samples/README.md`. |
+| `samples/` | Test material for every ingestion path - an 18-report CSV, a shift log, a text-layer PDF, a scan with no text layer, reports in six Indian languages, and `reports/`: fourteen mock PDF forms, a SIF and a non-SIF report in each of seven languages. See `samples/README.md`. |
+| `tools/make_mock_reports.py` | Builds `samples/reports/` (PyQt6 and PyMuPDF). |
 | `reports/` | Generated analysis report (PDF). |
 
 ## Result fields
@@ -654,6 +676,46 @@ produces it: `test_sif.py::TestEngineQuality` holds the floor at 0.90 recall and
 0.90 precision, and asserts `confirmed_unqueued == 0`, so a future change cannot
 quietly undo either.
 
+## Reports in Indian languages
+
+Reports come in as field staff write them. SENTRA reads **the language from the
+text itself** (`sif/langdetect.py`) - the Unicode script most of the letters are
+in, then, where languages share a script, the letters and common words that
+tell them apart: Hindi or Marathi (or Nepali) in Devanagari, Bengali or Assamese
+(ৰ, ৱ) in Bengali script, Urdu or Arabic. The *OCR language* box on Ingest only
+chooses the recogniser for scanned pages; it no longer labels a Hindi text
+file "English".
+
+**One report is one report** (`sif/segment.py`). A report form's letterhead,
+narrative and "Immediate action:" paragraph stay together; a shift log splits
+into its entries without its title; a file of reports marked with separator
+lines (`--- HINDI ---`) splits on those. A blank line alone is not a boundary.
+
+**Without the LLM, a keyword gloss** (`sif/glossary.py`). With Ollama and
+`gemma2:latest`, a non-English report is translated before analysis. Without
+it, SENTRA finds the safety concepts the engines score - height, 11 kV, a
+suspended load, hot work beside LPG, H2S, and the failed barriers: no LOTO, no
+gas test, an expired permit, a lanyard on a handrail, nobody clear of the load -
+in Hindi, Marathi, Assamese, Bengali, Tamil, Telugu, Kannada and Urdu, and hands
+their English names to the engines. A barrier counts as failed only when the
+word sits next to a negation in the same sentence, so "gas test done, fire
+watch present" does not read as a failure. It is labelled everywhere as a
+**keyword gloss, not a translation**, and kept apart from `translated_text`.
+The site (`नहरकटिया रिग-12` → *Naharkatiya Rig-12*) and the report's date are
+read off the form too, so the map and the trend place it.
+
+**What the Ingest page says.** The Language column reads `Hindi`, then after
+analysis `Hindi → English` (translated), `Hindi · keyword gloss`, or
+`Hindi · not translated`; a file with several languages reads `5 languages`
+and the processing log names each. The *Translate* stage counts translated,
+glossed and as-written reports.
+
+**Mock reports to try it** - `samples/reports/`: a SIF precursor and a non-SIF
+report as one-page PDF forms in English, Assamese, Hindi, Bengali, Tamil,
+Marathi and Kannada (14 files, made by `tools/make_mock_reports.py`). All
+fourteen come through with the right language and the right verdict, with or
+without Ollama. See `samples/reports/README.md`.
+
 ## Review happens in English
 
 A reviewer confirms or overturns a fatal-potential call. They cannot do that on
@@ -663,8 +725,9 @@ bar above it says which text is on screen:
 
 | The report | What the bench shows | What the bar says |
 | --- | --- | --- |
-| Translated from Tamil | The English | `ENGLISH - TRANSLATED FROM TAMIL FOR REVIEW`, with **Show the original** beside it |
-| Not in English, not translated | The original, because there is nothing else | `NOT TRANSLATED - ... START OLLAMA AND RE-ANALYSE BEFORE DECIDING` in red |
+| Translated from Tamil | The English | `ENGLISH — TRANSLATED FROM TAMIL`, with **Show the original** beside it |
+| Not translated, read through the keyword gloss | The original (a gloss is a list of terms, not something to decide on) | `ORIGINAL · HINDI`, with **Show the keyword gloss** beside it |
+| Not in English, not translated, nothing glossed | The original | `HINDI AS WRITTEN · NOT TRANSLATED` |
 | Written in English | The report | `ENGLISH AS WRITTEN` |
 
 The original is never hidden and never replaced: it is one button away on the
@@ -779,12 +842,13 @@ On a headless machine prefix with `QT_QPA_PLATFORM=offscreen`, and with
 `SIF_ENCODER=hashing` to pin the offline encoder so the run needs no model
 download and is deterministic.
 
-**456 tests.** They cover every pipeline stage and the fusion guards, the MLOps
+**492 tests.** They cover every pipeline stage and the fusion guards, the MLOps
 round-trip, document extraction and the OCR model cache, the local LLM's
 readiness and model-name handling, the review bench and its decision trail, the
 update checker and the release pipeline, sign-in, roles and the audit chain, the
 two workspaces, the compliance calendar, the asset memory and work-hold
-recommendations, SENTRA's database, vector index, sync,
+recommendations, language detection, report splitting and the keyword gloss,
+the risk trend's ranges and the spider chart, SENTRA's database, vector index, sync,
 encrypted backup and restore against local S3 and WebDAV servers — and the
 interface itself, driven headless against the real `samples/` files from import
 through review to a trained model.

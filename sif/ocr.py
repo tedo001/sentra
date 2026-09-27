@@ -218,10 +218,10 @@ class ExtractedDocument:
         return not self.text.strip()
 
     def blocks(self) -> List[str]:
-        """Split the document into report-sized blocks on blank lines."""
-        raw = [block.strip() for block in self.text.split("\n\n")]
-        blocks = [block for block in raw if len(block) > 25]
-        return blocks or ([self.text.strip()] if self.text.strip() else [])
+        """The reports in the document - see :func:`sif.segment.split_reports`."""
+        from sif.segment import split_reports
+
+        return split_reports(self.text)
 
     def to_dict(self) -> dict:
         return {"path": self.path, "backend": self.backend, "pages": self.pages,

@@ -7,11 +7,12 @@ one path through the console each.
 | File | Path it exercises | What to expect |
 | --- | --- | --- |
 | `near_miss_reports.csv` | **Import CSV of reports** | 18 reports; 13 flag SIF potential and all 18 reach the review queue |
-| `shift_log.txt` | **Add documents** (text) | One night-shift log; splits into 6 blocks, 5 of them analysable |
+| `shift_log.txt` | **Add documents** (text) | One night-shift log; splits into its 5 entries (the log's title is not a report) |
 | `permit_observation.pdf` | **Add documents** (PDF text layer) | Read without OCR by `pypdfium2`; analyses as SIF potential, risk 80.7, Work Authorisation |
 | `scanned_uauc_report.png` | **Add documents** (PaddleOCR) | A page with no text layer, so the OCR path has to run |
-| `multilingual_report.txt` | **Language / translation** | Five blocks in Hindi, Marathi, Tamil, Telugu and Kannada |
+| `multilingual_report.txt` | **Language / translation** | Five reports, split on their `---` separator lines and each named in its own language: Hindi, Marathi, Tamil, Telugu, Kannada |
 | `languages/` | **One report per language** | Six full reports - Tamil, Hindi, Marathi, Telugu, Kannada, Urdu - each its own file, with its own README |
+| `reports/` | **PDF forms in seven languages** | 14 mock UA/UC forms - a SIF precursor and a non-SIF report in each of English, Assamese, Hindi, Bengali, Tamil, Marathi and Kannada. Each reads as one report, in its language, with the right verdict, with or without Ollama. See `reports/README.md` |
 | `training_corpus.csv` | **Training the model** | 56 labelled reports - 33 precursors, 23 controls. See below |
 
 ## `training_corpus.csv` - labelled data for training

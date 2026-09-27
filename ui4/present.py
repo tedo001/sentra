@@ -16,6 +16,7 @@ from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 __all__ = ["ACTION_WORDS", "age", "case_line", "clock", "day_month", "describe_action",
            "initials", "queued_at", "received", "review_status", "row_when", "stamp",
            "trigger_counts", "weekly_series", "weekly_table", "fmt_date", "fmt_time",
+           "TREND_SPANS", "trend_table", "trend_rows", "PROFILES", "risk_profile",
            "fmt_datetime", "fmt_week", "in_zone", "zone", "date_format", "ZONES"]
 
 #: Audit actions as a sentence about a person, for timelines.
@@ -334,3 +335,238 @@ def weekly_table(rows: Sequence[Dict[str, object]], weeks: int = 13,
             if float(row.get("risk_score") or 0) >= 85:
                 table[index]["critical"] += 1
     return table
+
+
+# -- the risk trend up to now, and the risk profile ------------------------------------
+
+#: The risk trend's ranges, each ending now: (key, button, unit, caption).
+TREND_SPANS: Tuple[Tuple[str, str, str, str], ...] = (
+    ("today", "Today", "hour", "hourly"),
+    ("week", "Week", "day", "daily · last 7 days"),
+    ("month", "Month", "day", "daily · last 30 days"),
+    ("year", "Year", "month", "monthly · last 12 months"),
+    ("all", "All", "", "every dated report"),
+)
+CRITICAL_SCORE = 85
+
+
+def _moment(row: Dict[str, object]) -> Tuple[Optional[datetime], bool]:
+    """When a report happened, in the chosen zone, and whether a time was given.
+
+    A date alone ("2026-09-10") is a calendar day and is not shifted; it has
+    no hour, so the Today view counts it apart instead of at midnight.
+    """
+    reported = str(row.get("reported_on") or "").strip()
+    when = _parse(reported) if reported else None
+    if when is not None:
+        timed = len(reported) > 10
+        return ((in_zone(when).replace(tzinfo=None) if timed else when), timed)
+    analysed = _parse(row.get("analysed_at"))
+    if analysed is None:
+        return None, False
+    return in_zone(analysed).replace(tzinfo=None), True
+
+
+def _month_start(day: date, back: int = 0) -> date:
+    month = day.year * 12 + day.month - 1 - back
+    return date(month // 12, month % 12 + 1, 1)
+
+
+def _bucket(start: object, label: str, title: str) -> Dict[str, object]:
+    return {"start": start, "label": label, "title": title,
+            "sif": 0, "critical": 0, "reports": 0}
+
+
+def _count(bucket: Dict[str, object], row: Dict[str, object]) -> None:
+    bucket["reports"] += 1
+    if row.get("sif_potential"):
+        bucket["sif"] += 1
+    if float(row.get("risk_score") or 0) >= CRITICAL_SCORE:
+        bucket["critical"] += 1
+
+
+def _day_label(day: date) -> str:
+    return day.strftime("%d %b").lstrip("0")
+
+
+def trend_table(rows: Sequence[Dict[str, object]], span: str = "month",
+                now: Optional[datetime] = None) -> Dict[str, object]:
+    """SIF potential, critical and all reports per hour, day or month, up to now.
+
+    ``span`` is one of :data:`TREND_SPANS`: today by hour, the last 7 or 30
+    days by day, the last 12 months by month, or every dated report (by day,
+    week or month, whichever keeps the chart readable). Every range ends at
+    the present moment - "up to date" - not at the latest report, so a quiet
+    week shows as quiet.
+
+    Returns ``{"span", "unit", "caption", "buckets", "untimed", "first", "last"}``;
+    each bucket has ``start``, ``label``, ``title``, ``sif``, ``critical`` and
+    ``reports``. ``untimed`` counts today's reports that give a date and no
+    time - they have no hour to go in and get a bucket of their own.
+    """
+    now = in_zone(now or datetime.now()).replace(tzinfo=None)
+    today = now.date()
+    keys = {key: (unit, caption) for key, _button, unit, caption in TREND_SPANS}
+    span = span if span in keys else "month"
+    unit, caption = keys[span]
+    moments = [(_moment(row), row) for row in rows]
+    moments = [(when, timed, row) for (when, timed), row in moments if when is not None]
+    untimed = 0
+
+    if span == "today":
+        buckets = [_bucket(datetime.combine(today, datetime.min.time()) + timedelta(hours=hour),
+                           f"{hour:02d}:00",
+                           f"{fmt_date(today)}, {hour:02d}:00\u2013{(hour + 1) % 24:02d}:00 "
+                           f"{zone()[1]}") for hour in range(24)]
+        # A report dated today with no time has no hour: it is counted in the
+        # range's total and named in the caption, not drawn at midnight.
+        loose = _bucket(None, "No time", f"{fmt_date(today)} - date given, no time")
+        for when, timed, row in moments:
+            if when.date() != today:
+                continue
+            if timed:
+                _count(buckets[when.hour], row)
+            else:
+                _count(loose, row)
+                untimed += 1
+        caption = f"{fmt_date(today)} · hourly"
+    elif span in ("week", "month"):
+        days = 7 if span == "week" else 30
+        first = today - timedelta(days=days - 1)
+        buckets = [_bucket(first + timedelta(days=i),
+                           ((first + timedelta(days=i)).strftime("%a ") if span == "week" else "")
+                           + _day_label(first + timedelta(days=i)),
+                           (first + timedelta(days=i)).strftime("%A ") +
+                           fmt_date(first + timedelta(days=i)))
+                   for i in range(days)]
+        for when, _timed, row in moments:
+            index = (when.date() - first).days
+            if 0 <= index < days:
+                _count(buckets[index], row)
+        caption = f"{fmt_date(first)} \u2192 {fmt_date(today)} · daily"
+    elif span == "year":
+        months = [_month_start(today, back) for back in range(11, -1, -1)]
+        buckets = [_bucket(month, month.strftime("%b") + (month.strftime(" %y")
+                                                          if month.month == 1 or i == 0 else ""),
+                           month.strftime("%B %Y")) for i, month in enumerate(months)]
+        for when, _timed, row in moments:
+            key = date(when.year, when.month, 1)
+            if months[0] <= key <= months[-1]:
+                index = (key.year - months[0].year) * 12 + key.month - months[0].month
+                _count(buckets[index], row)
+        caption = (f"{months[0].strftime('%b %Y')} \u2192 {months[-1].strftime('%b %Y')}"
+                   " · monthly")
+    else:
+        if not moments:
+            return {"span": span, "unit": "day", "caption": "no dated reports", "buckets": [],
+                    "untimed": 0, "first": None, "last": None}
+        first_day = min(when.date() for when, _timed, _row in moments)
+        last_day = max(max(when.date() for when, _timed, _row in moments), today)
+        length = (last_day - first_day).days + 1
+        if length <= 31:
+            unit = "day"
+            buckets = [_bucket(first_day + timedelta(days=i), _day_label(first_day + timedelta(days=i)),
+                               fmt_date(first_day + timedelta(days=i))) for i in range(length)]
+            for when, _timed, row in moments:
+                _count(buckets[(when.date() - first_day).days], row)
+        elif length <= 26 * 7:
+            unit = "week"
+            start = first_day - timedelta(days=first_day.weekday())
+            weeks = ((last_day - start).days // 7) + 1
+            buckets = [_bucket(start + timedelta(weeks=i), _day_label(start + timedelta(weeks=i)),
+                               "Week " + fmt_week(start + timedelta(weeks=i))) for i in range(weeks)]
+            for when, _timed, row in moments:
+                _count(buckets[(when.date() - start).days // 7], row)
+        else:
+            unit = "month"
+            start = date(first_day.year, first_day.month, 1)
+            count = (last_day.year - start.year) * 12 + last_day.month - start.month + 1
+            months = [_month_start(start, -i) for i in range(count)]
+            buckets = [_bucket(month, month.strftime("%b %y"), month.strftime("%B %Y"))
+                       for month in months]
+            for when, _timed, row in moments:
+                index = (when.year - start.year) * 12 + when.month - start.month
+                _count(buckets[index], row)
+        caption = (f"{fmt_date(first_day)} \u2192 {fmt_date(last_day)} · "
+                   f"{ {'day': 'daily', 'week': 'weekly', 'month': 'monthly'}[unit] }")
+    in_range = sum(bucket["reports"] for bucket in buckets) + untimed
+    return {"span": span, "unit": unit, "caption": caption, "buckets": buckets,
+            "untimed": untimed, "reports": in_range,
+            "untimed_counts": loose if span == "today" else None,
+            "first": buckets[0]["start"] if buckets else None,
+            "last": buckets[-1]["start"] if buckets else None}
+
+
+def trend_rows(rows: Sequence[Dict[str, object]], span: str = "month",
+               now: Optional[datetime] = None) -> List[Dict[str, object]]:
+    """The reports inside the trend's range - what the spider chart beside it draws."""
+    now = in_zone(now or datetime.now()).replace(tzinfo=None)
+    today = now.date()
+    first = {"today": today, "week": today - timedelta(days=6),
+             "month": today - timedelta(days=29),
+             "year": _month_start(today, 11)}.get(span)
+    kept = []
+    for row in rows:
+        when, _timed = _moment(row)
+        if when is None:
+            continue
+        if first is None or first <= when.date() <= today:
+            kept.append(row)
+    return kept
+
+
+#: The spider chart's views: (key, button, axes as (full name, short label)).
+PROFILES: Tuple[Tuple[str, str, Tuple[Tuple[str, str], ...]], ...] = (
+    ("rule", "IOGP rule", (
+        ("Working at Height", "Height"), ("Energy Isolation", "Isolation"),
+        ("Line of Fire", "Line of fire"), ("Confined Space", "Confined space"),
+        ("Safe Mechanical Lifting", "Lifting"), ("Hot Work", "Hot work"),
+        ("Driving", "Driving"), ("Bypassing Safety Controls", "Bypass"),
+        ("Work Authorisation", "Permit"), ("Excavation & Ground Disturbance", "Excavation"),
+        ("Well Control & Process Containment", "Well control"))),
+    ("energy", "Energy", (
+        ("Gravity / Fall from height", "Fall"), ("Electrical energy", "Electrical"),
+        ("Suspended load / Mechanical", "Load"), ("Pressure / Stored energy", "Pressure"),
+        ("Fire / Explosion", "Fire"), ("Toxic / Asphyxiant atmosphere", "Toxic"),
+        ("Vehicle / Traffic motion", "Traffic"), ("Excavation / Ground collapse", "Ground"),
+        ("Thermal energy", "Thermal"))),
+    ("barrier", "Barrier", (
+        ("Fall protection not used / not anchored", "Fall protection"),
+        ("Energy isolation / LOTO not applied or verified", "LOTO"),
+        ("Permit to work / JSA absent, expired or not followed", "Permit / JSA"),
+        ("Gas testing / ventilation / atmospheric control missing", "Gas test"),
+        ("Exclusion zone / barricading absent", "Exclusion zone"),
+        ("Safety device bypassed, inhibited or removed", "Bypass"),
+        ("Fire prevention controls not in place", "Fire prevention"),
+        ("Mandatory PPE not worn", "PPE"),
+        ("Competence / supervision inadequate", "Supervision"),
+        ("Traffic / journey management control breached", "Journey"),
+        ("Equipment integrity / inspection lapse", "Integrity"),
+        ("Well monitoring / containment control lapsed", "Well"))),
+)
+
+
+def risk_profile(rows: Sequence[Dict[str, object]], by: str = "rule"
+                 ) -> List[Tuple[str, str, int, int, int]]:
+    """Per axis of the spider chart: (full name, short label, SIF, critical, all).
+
+    A report counts on every axis it names - an energy source of "Electrical
+    energy + Fire / Explosion" is on both - and the axes are fixed, so the
+    shape can be compared between one period and the next.
+    """
+    axes = dict((key, axes) for key, _button, axes in PROFILES).get(by) or PROFILES[0][2]
+    field, split = {"rule": ("iogp_rule", None), "energy": ("energy_source", "+"),
+                    "barrier": ("barrier_failure", ";")}.get(by, ("iogp_rule", None))
+    counts = {name: [0, 0, 0] for name, _short in axes}
+    for row in rows:
+        value = str(row.get(field) or "")
+        names = [part.strip() for part in value.split(split)] if split else [value.strip()]
+        for name in set(names):
+            if name in counts:
+                slot = counts[name]
+                slot[2] += 1
+                if row.get("sif_potential"):
+                    slot[0] += 1
+                if float(row.get("risk_score") or 0) >= CRITICAL_SCORE:
+                    slot[1] += 1
+    return [(name, short, *counts[name]) for name, short in axes]

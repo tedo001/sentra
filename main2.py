@@ -51,6 +51,9 @@ from PyQt6.QtWidgets import (
 from main import read_csv_records
 from sif import SEED_REPORTS, SIFPipeline
 from sif.narrative import corpus_bulletin
+from sif.langdetect import detect_language
+from sif.segment import report_date, split_reports
+from sif.glossary import keyword_gloss, site_in
 from sif.llm import OllamaEngine, looks_non_latin
 from sif.logging_setup import (LOG_LEVELS, active_log_file, configure_logging,
                                log_file_path, set_level)
@@ -191,14 +194,28 @@ class AnalysisWorker(QThread):
             for index, (narrative, reference, extra) in enumerate(pairs, start=1):
                 if self.isInterruptionRequested():
                     break
-                translated, language = "", ""
+                # The report's own language, read from its text - not the OCR
+                # setting, which says which recogniser reads a scan and nothing
+                # about a text file or a pasted narrative.
+                detected = detect_language(narrative)
+                translated = ""
+                language = "" if detected.english or not detected.code else detected.label
                 if looks_non_latin(narrative) and self._can_translate():
-                    self.status.emit(f"Translating report {index} to English")
+                    self.status.emit(f"Translating report {index} from {detected.name} "
+                                     "to English")
                     translated = self._translator.translate(narrative)
-                    language = self._language
                     if not translated:
                         self.status.emit(
                             f"Translation unavailable for report {index} - analysing as written")
+                translation = "llm" if translated else ""
+                if not translated and language:
+                    # No translation: the engines read an English gloss of
+                    # the safety concepts in the report, not nothing at all.
+                    translated = keyword_gloss(narrative)
+                    if translated:
+                        translation = "gloss"
+                        self.status.emit(f"Report {index}: {detected.name} read through an "
+                                         "English keyword gloss (no LLM translation)")
                 if self._pipeline.has_llm:
                     # A local model reading a report takes seconds, not
                     # milliseconds. Say so, or the window looks hung.
@@ -208,9 +225,26 @@ class AnalysisWorker(QThread):
                 result = self._pipeline.analyze(narrative, reference, translated, language)
                 payload = result.to_dict()
                 payload["_timestamp"] = datetime.now().strftime("%H:%M:%S")
+                payload["translation"] = translation
+                if translation == "gloss":
+                    # Kept apart: translated_text only ever holds a translation.
+                    payload["gloss"] = payload.get("translated_text") or ""
+                    payload["translated_text"] = ""
                 # When and where it happened and who filed it, as the export
                 # said - the engine's own location reading stays alongside.
                 payload.update(extra)
+                if not payload.get("reported_on"):
+                    # The date on the form itself ("Date: 14-09-2026",
+                    # "दिनांक: 18-09-2026"), so the trend puts it on its day.
+                    dated = report_date(narrative)
+                    if dated:
+                        payload["reported_on"] = dated
+                if language and not payload.get("site"):
+                    # The site as the report wrote it, in its own script -
+                    # named in English so the risk map and asset memory see it.
+                    site = site_in(narrative)
+                    if site:
+                        payload["site"] = site
                 if source:
                     payload["source"] = source
                 self.row_ready.emit(payload)
@@ -1035,7 +1069,7 @@ class MainWindow(QMainWindow):
     @requires(ANALYSE)
     def analyse_text(self, raw: str) -> None:
         """Analyse whatever is in the ingestion box."""
-        blocks = [block.strip() for block in (raw or "").split("\n\n") if block.strip()]
+        blocks = split_reports(raw or "")
         if not blocks:
             QMessageBox.information(self, APP_NAME,
                                     "Paste at least one report narrative before analysing.")
@@ -1572,8 +1606,7 @@ class MainWindow(QMainWindow):
         text = str(payload.pop("text", ""))
         blocks: List[str] = []
         if text.strip():
-            blocks = [block.strip() for block in text.split("\n\n")
-                      if len(block.strip()) > 25] or [text.strip()]
+            blocks = split_reports(text)
         # Kept on the document rather than poured into one shared list, so a
         # row's own controls can preview, analyse or drop exactly its blocks.
         payload["_text"] = text
@@ -1611,12 +1644,16 @@ class MainWindow(QMainWindow):
         recorded either way. An operator whose reports came back untranslated can
         then read why on the workflow map instead of guessing.
         """
+        # Each run asks once; a batch of fourteen files is fourteen runs. Say it
+        # (log and audit) when the answer changes, not fourteen times over.
+        changed = (ready, reason) != (self.llm_online, self.llm_message)
         self.llm_online = ready
         self.llm_message = reason
         self.engines_view.set_llm_status(reason, self.llm.models() if ready else ())
-        self.audit.system("translation readiness", ok=ready, outcome=reason[:160])
-        if not ready:
-            LOGGER.warning("Translation unavailable: %s", reason)
+        if changed:
+            self.audit.system("translation readiness", ok=ready, outcome=reason[:160])
+            if not ready:
+                LOGGER.warning("Translation unavailable: %s", reason)
         self._refresh_workflow()
 
     def on_trained(self, report: Dict[str, object]) -> None:

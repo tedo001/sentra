@@ -55,7 +55,7 @@ from sif.scoring import MAX_SCORE, cap_probability
 from sif.vault import Vault
 from sif.vectorstore import VectorStore
 from ui4.admin_wiring import setting
-from ui4.present import fmt_datetime, in_zone, stamp, weekly_table, zone
+from ui4.present import fmt_datetime, in_zone, risk_profile, stamp, trend_rows, trend_table, zone
 from ui5.actions import SentraActions
 from ui5.assets import KIND_LABEL, LEVEL_TONE, AssetMemoryPage
 from ui5.dashboard import VIOLET, SentraDashboard
@@ -239,14 +239,34 @@ class SentraWindow(WorkspaceWindow):
         elif key == "assets" and self._shell_ready and hasattr(self, "assets_page"):
             self._refresh_assets_page()
 
+    def _build_dashboard(self):
+        page = super()._build_dashboard()
+        page.trend_changed.connect(self._refresh_trend)
+        return page
+
     def _refresh_dashboard(self) -> None:
         super()._refresh_dashboard()
-        period = self.dashboard_page.filters[0]
-        weeks = {"30": 5, "90": 13, "365": 52}.get(period, 13)
-        label = {"30": "last 30 days", "90": "last 90 days", "365": "last 12 months"}[period]
-        self.dashboard_page.set_weekly(weekly_table(getattr(self, "_dashboard_rows", []),
-                                                    weeks=weeks), label)
+        self._refresh_trend()
         self.dashboard_page.set_updated(f"Updated {fmt_datetime(datetime.now())}")
+
+    def _refresh_trend(self) -> None:
+        """The risk trend and the spider chart, up to now, for the chosen site and activity.
+
+        The dashboard's period buttons count back from the latest report (an
+        imported history reads as it was); the trend's own range counts back
+        from now - today, this week, this month, this year - so it is up to date.
+        """
+        page = self.dashboard_page
+        _period, site, activity = page.filters
+        rows = [row for row in self.rows
+                if (not site or (row.get("site") or row.get("location")) == site)
+                and (not activity or row.get("activity") == activity)]
+        now = datetime.now()
+        table = trend_table(rows, page.trend_span_key, now)
+        page.set_trend_range(table)
+        in_range = trend_rows(rows, page.trend_span_key, now)
+        page.set_profile(risk_profile(in_range, page.profile_key), str(table.get("caption") or ""),
+                         len(in_range))
 
     # -- background jobs --------------------------------------------------------------
 

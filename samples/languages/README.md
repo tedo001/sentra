@@ -15,13 +15,17 @@ translate-before-analysis step.
 
 ## How to use them
 
-1. **Ingest and OCR** → pick the language in **OCR LANGUAGE**.
-2. **Add documents** → choose the file. A `.txt` is read directly, so this
-   tests the language path without needing the OCR models.
-3. **Analyse extracted blocks**.
-4. With Ollama running and *Translate non-English reports* ticked, the
+1. **Ingest** → **Choose files...** → the file. A `.txt` is read directly, so
+   this tests the language path without the OCR models. There is no need to
+   set the OCR language: the report's language is read from its text, and the
+   Language column says `Hindi`, `Tamil`...
+2. **Start processing**. Each file is one report - the letterhead, narrative
+   and "Immediate action" stay together.
+3. With Ollama running and *Translate non-English for review* ticked, the
    report is rendered into English first and the original is kept as the
-   audit record. Without Ollama the text is analysed as it stands.
+   audit record (`Hindi → English`). Without Ollama the engines read an
+   English **keyword gloss** of the report's safety terms (`Hindi · keyword
+   gloss`), so each of these six precursors is still flagged.
 
 Each report describes an incident the rule engine already knows in English,
 so you can compare: analyse the English equivalent from

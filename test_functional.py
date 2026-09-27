@@ -77,9 +77,9 @@ class TestIngestionPathsEndToEnd(unittest.TestCase):
         document = self.extractor.extract(os.path.join(SAMPLES, "shift_log.txt"))
         self.assertEqual(document.backend, "text")
         blocks = document.blocks()
-        self.assertGreaterEqual(len(blocks), 5)
+        self.assertEqual(len(blocks), 5, "five entries; the log's title is not a report")
         results = [self.pipeline.analyze(block, reference=f"LOG-{index:02d}")
-                   for index, block in enumerate(blocks[1:], start=1)]
+                   for index, block in enumerate(blocks, start=1)]
         self.assertTrue(all(result.iogp_rule for result in results))
 
     def test_a_pdf_is_read_through_its_text_layer_without_ocr(self) -> None:

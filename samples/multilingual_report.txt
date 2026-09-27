@@ -1,6 +1,6 @@
 OIL INDIA LIMITED - UA/UC REPORT - FIELD ENTRIES IN LOCAL LANGUAGES
-Use this file to test the language handling in build 2 (app2.py). Each block is
-one report; the console reads a language from the OCR/translation setting.
+Use this file to test the language handling. Each section below a separator line
+is one report; SENTRA reads each report's language from its own text.
 
 --- HINDI / हिन्दी ---
 पंप स्टेशन संख्या 3 पर रखरखाव के दौरान 11 केवी फीडर केबल बिना अर्थिंग के छोड़ दी गई

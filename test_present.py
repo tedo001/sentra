@@ -106,3 +106,85 @@ class TestDatesAndTimes(unittest.TestCase):
             self.assertEqual(present.fmt_week(date(2025, 12, 29)), "29 Dec 2025 – 4 Jan 2026")
         with mock.patch.object(present, "date_format", lambda: "%Y-%m-%d"):
             self.assertEqual(present.fmt_date("2026-01-07"), "2026-01-07")
+
+
+class TestTrendUpToNow(unittest.TestCase):
+    """The dashboard's risk trend: today, week, month, year, all - ending now."""
+
+    NOW = datetime(2026, 9, 27, 14, 0)
+
+    def setUp(self) -> None:
+        from ui4 import present
+
+        # Times read as written, whatever zone this machine and Settings are in.
+        original = present.in_zone
+        present.in_zone = lambda when: when.replace(tzinfo=None)
+        self.addCleanup(setattr, present, "in_zone", original)
+        self.rows = [
+            {"reported_on": "2026-09-27T09:15:00", "sif_potential": True, "risk_score": 90,
+             "iogp_rule": "Hot Work", "energy_source": "Fire / Explosion",
+             "barrier_failure": "Fire prevention controls not in place; Mandatory PPE not worn"},
+            {"reported_on": "2026-09-27", "sif_potential": False, "risk_score": 20,
+             "iogp_rule": "Driving"},
+            {"reported_on": "2026-09-21", "sif_potential": True, "risk_score": 70,
+             "iogp_rule": "Hot Work"},
+            {"reported_on": "2025-12-02", "sif_potential": True, "risk_score": 88,
+             "iogp_rule": "Driving", "energy_source": "Vehicle / Traffic motion"},
+            {"reported_on": "", "analysed_at": ""},
+        ]
+
+    def test_today_is_by_the_hour_and_a_date_alone_is_counted_apart(self) -> None:
+        from ui4.present import trend_table
+
+        table = trend_table(self.rows, "today", self.NOW)
+        self.assertEqual((table["unit"], len(table["buckets"])), ("hour", 24))
+        hours = [bucket["label"] for bucket in table["buckets"] if bucket["reports"]]
+        self.assertEqual(hours, ["09:00"])
+        self.assertEqual(table["untimed"], 1)
+        self.assertEqual(table["reports"], 2)
+
+    def test_week_and_month_are_day_by_day_ending_today(self) -> None:
+        from ui4.present import trend_table
+
+        week = trend_table(self.rows, "week", self.NOW)
+        self.assertEqual(len(week["buckets"]), 7)
+        self.assertEqual(week["buckets"][-1]["start"], date(2026, 9, 27))
+        self.assertEqual(week["buckets"][0]["label"], "Mon 21 Sep")
+        self.assertEqual([bucket["sif"] for bucket in week["buckets"]], [1, 0, 0, 0, 0, 0, 1])
+        month = trend_table(self.rows, "month", self.NOW)
+        self.assertEqual(len(month["buckets"]), 30)
+        self.assertEqual(month["reports"], 3)
+
+    def test_the_year_is_month_by_month_with_critical_counted(self) -> None:
+        from ui4.present import trend_table
+
+        year = trend_table(self.rows, "year", self.NOW)
+        self.assertEqual(len(year["buckets"]), 12)
+        self.assertEqual(year["buckets"][0]["start"], date(2025, 10, 1))
+        self.assertEqual(year["buckets"][0]["label"], "Oct 25")
+        december = next(bucket for bucket in year["buckets"] if bucket["start"].month == 12)
+        self.assertEqual((december["sif"], december["critical"], december["reports"]), (1, 1, 1))
+        self.assertEqual(year["buckets"][-1]["critical"], 1)
+
+    def test_all_picks_a_readable_unit(self) -> None:
+        from ui4.present import trend_table
+
+        self.assertEqual(trend_table(self.rows, "all", self.NOW)["unit"], "month")
+        recent = [row for row in self.rows if str(row.get("reported_on")).startswith("2026-09")]
+        self.assertEqual(trend_table(recent, "all", self.NOW)["unit"], "day")
+        self.assertEqual(trend_table([], "all", self.NOW)["buckets"], [])
+
+    def test_the_spider_chart_counts_a_report_on_every_axis_it_names(self) -> None:
+        from ui4.present import risk_profile, trend_rows
+
+        this_month = trend_rows(self.rows, "month", self.NOW)
+        self.assertEqual(len(this_month), 3)
+        rules = {short: (sif, critical, total)
+                 for _name, short, sif, critical, total in risk_profile(this_month, "rule")}
+        self.assertEqual(rules["Hot work"], (2, 1, 2))
+        self.assertEqual(rules["Driving"], (0, 0, 1))
+        barriers = {short: total for _name, short, _s, _c, total
+                    in risk_profile(self.rows, "barrier")}
+        self.assertEqual((barriers["Fire prevention"], barriers["PPE"]), (1, 1))
+        energy = {short: total for _name, short, _s, _c, total in risk_profile(self.rows, "energy")}
+        self.assertEqual((energy["Fire"], energy["Traffic"]), (1, 1))

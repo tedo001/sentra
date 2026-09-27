@@ -66,11 +66,16 @@ Three ways in. Pick the one that matches what you have.
 ### B. Documents — PDFs, scans, photographs
 
 1. **Ingest and OCR** → **Add documents (PDF, PNG, JPG, TIFF, TXT)** (or `Ctrl+D`).
-2. **Before you do**, set **OCR LANGUAGE** if the paperwork is not in English.
+2. **Scans only:** set **OCR LANGUAGE** to the script on a scanned page or
+   photograph, so the right recogniser reads it. Text files and PDFs with a text
+   layer need nothing: SENTRA reads each report's language from its own text.
 3. Each file is read: a PDF with a text layer is read directly (fast, exact); a
    scan or photograph goes through PaddleOCR. The **Extracted documents** table
    shows which backend was used, the page count and the OCR confidence.
-4. The text is split into report-sized blocks on blank lines.
+4. The text is split into reports: a report form (letterhead, narrative,
+   "Immediate action:") stays one report; a shift log splits into its entries;
+   `---` separator lines divide a file of several reports. The Language column
+   then names each file's language (`Hindi`, `Tamil`, `5 languages`...).
 5. Click **Analyse extracted blocks**. (**Clear extraction list** drops what is
    waiting without analysing it.)
 
@@ -110,6 +115,17 @@ The five tiles across the top:
 Then the three exposure charts. **The failed-barrier chart is usually the most
 actionable** — it names the control that keeps failing, and a control is
 something you can fix.
+
+**Risk trend.** Choose the range - **Today** (hour by hour), **Week** or
+**Month** (day by day), **Year** (month by month) or **All** - and **Line** or
+**Bar**. Every range ends now. Hover a point for that hour, day or month's
+figures; the peaks, the average and the total are underneath.
+
+**Risk profile (spider chart).** The same reports on fixed spokes - **IOGP
+rule**, **Energy** or **Barrier**. Grey is all reports, navy SIF potential, red
+critical. A spoke that bulges is where exposure is concentrated; hover it for
+the counts. Compare this month's shape with last month's by switching the
+trend range.
 
 ### Step 2 — Reports and evidence
 

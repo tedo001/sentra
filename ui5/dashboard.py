@@ -1,14 +1,16 @@
 """Dashboard, as the revamp lays it out.
 
 Five figures; SIF exposure by IOGP rule (navy bars), failed barrier controls
-(violet bars) and the latest reports side by side; then the weekly risk trend
-across the page - line or bar, SIF potential, critical and total reports, an
-average line - with the week's peaks and totals beneath it. High-energy
-sources and flagged activities follow, so nothing the two-workspace
-dashboard shows is lost.
+(violet bars) and the latest reports side by side; then the risk trend up to
+now - today by the hour, the last week or month by the day, the last year by
+the month, or every dated report - line or bar, SIF potential, critical and
+total reports, an average line, with the peaks and totals beneath it; and
+beside it the risk profile, a spider chart of the same reports by IOGP rule,
+energy source or failed barrier. High-energy sources and flagged activities
+follow, so nothing the two-workspace dashboard shows is lost.
 
 Same interface as :class:`ui4.dashboard.DashboardPage`, plus
-:meth:`set_weekly`, so the same wiring fills it.
+:meth:`set_trend_range` and :meth:`set_profile`, so the same wiring fills it.
 """
 
 from __future__ import annotations
@@ -21,9 +23,9 @@ from PyQt6.QtWidgets import QComboBox, QGridLayout, QHBoxLayout, QLabel, QPushBu
 
 from ui4.dashboard import RECENT_COLUMNS
 from ui4.kit import Card, Col, DesignTable, Page, Segmented, StatStrip, link_button
-from ui4.present import fmt_date, fmt_week, received
+from ui4.present import PROFILES, TREND_SPANS, fmt_date, fmt_week, received
 
-from .charts import AxisBarChart, TrendChart
+from .charts import AxisBarChart, RadarChart, TrendChart
 
 __all__ = ["SentraDashboard"]
 
@@ -40,17 +42,24 @@ VIOLET = "#7C3AED"
 
 
 class _Legend(QLabel):
-    def __init__(self) -> None:
+    def __init__(self, total: str = "┄") -> None:
         super().__init__(
             "<span style='color:#1E3A5F'>━</span> SIF potential&nbsp;&nbsp;&nbsp;"
             "<span style='color:#DC2626'>━</span> Critical risk&nbsp;&nbsp;&nbsp;"
-            "<span style='color:#9CA3AF'>┄</span> Total reports")
+            f"<span style='color:#9CA3AF'>{total}</span> Total reports")
         self.setObjectName("CardCaption")
+
+
+#: How each range's buckets are named on the axis and in the summary.
+UNIT_WORDS = {"hour": ("Hour of day", "hour"), "day": ("Day", "day"),
+              "week": ("Week commencing", "week"), "month": ("Month", "month")}
 
 
 class SentraDashboard(Page):
     period_changed = pyqtSignal(str)
     filter_changed = pyqtSignal()
+    #: The trend's range (today/week/month/year/all) or the spider's view changed.
+    trend_changed = pyqtSignal()
     export_requested = pyqtSignal()
     queue_requested = pyqtSignal()
     report_requested = pyqtSignal(str)
@@ -106,22 +115,50 @@ class SentraDashboard(Page):
             top.setColumnStretch(column, 1)
         self.body.addLayout(top)
 
-        self.trend = Card("Risk Trend — Weekly SIF & Critical incidents", "")
-        self.trend_span = QLabel("")
-        self.trend_span.setObjectName("PageCaption")
-        self.trend.head_actions.insertWidget(2, self.trend_span)
+        self.trend = Card("Risk Trend — SIF & Critical incidents", "")
+        self.trend_range = Segmented(tuple((key, button) for key, button, _unit, _caption
+                                           in TREND_SPANS), "month")
+        self.trend_range.setToolTip("Up to now: today by the hour, the last 7 or 30 days by "
+                                    "the day, the last 12 months by the month")
+        self.trend_range.changed.connect(lambda _key: self.trend_changed.emit())
+        self.trend.add_head(self.trend_range)
         self.chart_mode = Segmented((("line", "↗ Line"), ("bar", "▄ Bar")), "line")
         self.chart_mode.changed.connect(lambda mode: self.trend_chart.set_mode(mode))
         self.trend.add_head(self.chart_mode)
-        self.trend.add_head(_Legend())
+        under = QHBoxLayout()
+        self.trend_span = QLabel("")
+        self.trend_span.setObjectName("PageCaption")
+        under.addWidget(self.trend_span)
+        under.addStretch(1)
+        under.addWidget(_Legend())
+        self.trend.body.addLayout(under)
         self.trend_chart = TrendChart()
         self.trend_chart.setMinimumHeight(300)
         self.trend.add(self.trend_chart)
-        self.summary = StatStrip(("Peak SIF / week", "Average SIF / week",
-                                  "Peak critical / week", "Total reports in period"))
+        self.summary = StatStrip(("Peak SIF / day", "Average SIF / day",
+                                  "Peak critical / day", "Total reports in period"))
         self.summary.setObjectName("SummaryStrip")
         self.trend.add(self.summary)
-        self.body.addWidget(self.trend)
+
+        self.profile = Card("Risk profile", "")
+        self.profile_view = Segmented(tuple((key, button) for key, button, _axes in PROFILES),
+                                      "rule")
+        self.profile_view.changed.connect(lambda _key: self.trend_changed.emit())
+        self.profile.add_head(self.profile_view)
+        self.profile_span = QLabel("")
+        self.profile_span.setObjectName("PageCaption")
+        self.profile.add(self.profile_span)
+        self.radar = RadarChart()
+        self.radar.setMinimumHeight(340)
+        self.profile.add(self.radar, 1)
+        legend = _Legend("▨")
+        legend.setWordWrap(True)
+        self.profile.add(legend)
+        trend_row = QHBoxLayout()
+        trend_row.setSpacing(16)
+        trend_row.addWidget(self.trend, 2)
+        trend_row.addWidget(self.profile, 1)
+        self.body.addLayout(trend_row)
 
         self.energy = Card("High-energy source", "")
         self._right(self.energy).setText("high-energy reports")
@@ -189,6 +226,65 @@ class SentraDashboard(Page):
 
     def set_trend(self, sif, critical, labels) -> None:
         """The two-workspace call; the weekly table (set_weekly) is what draws here."""
+
+    @property
+    def trend_span_key(self) -> str:
+        return self.trend_range.current
+
+    @property
+    def profile_key(self) -> str:
+        return self.profile_view.current
+
+    def set_trend_range(self, table: Dict[str, object]) -> None:
+        """Draw :func:`ui4.present.trend_table`'s buckets: up to now, per hour, day or month."""
+        buckets = list(table.get("buckets") or [])
+        axis, unit = UNIT_WORDS.get(str(table.get("unit") or "day"), UNIT_WORDS["day"])
+        sif = [float(bucket["sif"]) for bucket in buckets]
+        critical = [float(bucket["critical"]) for bucket in buckets]
+        reports = [float(bucket["reports"]) for bucket in buckets]
+        average = sum(sif) / len(sif) if sif else 0.0
+        self.trend_chart.axis_caption = axis
+        # Hours and days are counts, not a continuous flow: straight lines.
+        self.trend_chart.smooth = unit in ("week", "month")
+        self.trend_chart.set_data([str(bucket["label"]) for bucket in buckets], sif, critical,
+                                  reports, (average, "Average") if buckets else None,
+                                  titles=[str(bucket["title"]) for bucket in buckets])
+        caption = str(table.get("caption") or "")
+        if table.get("untimed"):
+            caption += f" · {table['untimed']} dated today without a time"
+        self.trend_span.setText(caption or "no dated reports")
+        for cell, text in zip(self.summary.cells, (f"Peak SIF / {unit}", f"Average SIF / {unit}",
+                                                   f"Peak critical / {unit}",
+                                                   "Total reports in period")):
+            cell.label.setText(text)
+        in_range = int(table.get("reports") or sum(reports))
+        if buckets and in_range:
+            peak = max(buckets, key=lambda bucket: bucket["sif"])
+            peak_critical = max(buckets, key=lambda bucket: bucket["critical"])
+            over = {"today": "each hour today", "week": "each day, last 7 days",
+                    "month": "each day, last 30 days", "year": "each month, last 12 months",
+                    }.get(str(table.get("span")), f"each {unit} in range")
+            values = ((f"{peak['sif']:g}", str(peak["title"]) if peak["sif"] else "none"),
+                      (f"{average:.1f}", over),
+                      (f"{peak_critical['critical']:g}",
+                       str(peak_critical["title"]) if peak_critical["critical"] else "none"),
+                      (f"{in_range:g}", "dated in this range" + (
+                          f" · {table['untimed']} without a time" if table.get("untimed")
+                          else "")))
+        else:
+            values = (("0", "no reports in this range"), ("0.0", ""), ("0", ""),
+                      ("0", "dated in this range"))
+        for cell, (value, note) in zip(self.summary.cells, values):
+            cell.set(value, note)
+
+    def set_profile(self, axes: Sequence[Tuple[str, str, int, int, int]], caption: str,
+                    reports: int = 0) -> None:
+        """The spider chart: per category (full name, short, SIF, critical, all)."""
+        self.radar.set_axes(axes)
+        placed = sum(1 for axis in axes if axis[4])
+        self.profile_span.setText(
+            f"{caption} · {reports} report(s), {placed} of {len(axes)} categories"
+            if reports else f"{caption} · no reports in this range")
 
     def set_weekly(self, weeks: Sequence[Dict[str, object]], period_label: str) -> None:
         labels = [str(week["label"]) for week in weeks]

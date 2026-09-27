@@ -151,15 +151,42 @@ class TestSentra(unittest.TestCase):
         self.assertEqual(window.pages.currentIndex(), window._page_index["data"])
         self.assertIn("SQLite", window.data_page.db_where.text())
 
-    def test_the_dashboard_draws_the_weekly_trend(self) -> None:
+    def test_the_risk_trend_runs_up_to_now_by_hour_day_or_month(self) -> None:
         window = self._window("reviewer")
         self._analyse(window)
         window.navigate("dashboard")
-        chart = window.dashboard_page.trend_chart
-        self.assertEqual(len(chart.weeks), 13)
-        self.assertIn("weekly counts", window.dashboard_page.trend_span.text())
-        window.dashboard_page.period.buttons["30"].click()
-        self.assertEqual(len(window.dashboard_page.trend_chart.weeks), 5)
+        page = window.dashboard_page
+        self.assertEqual(page.trend_span_key, "month", "the last 30 days, day by day")
+        expected = {"today": (24, "Hour of day", "hour"), "week": (7, "Day", "day"),
+                    "month": (30, "Day", "day"), "year": (12, "Month", "month")}
+        for span, (count, axis, unit) in expected.items():
+            with self.subTest(span):
+                page.trend_range.buttons[span].click()
+                self.assertEqual(len(page.trend_chart.weeks), count)
+                self.assertEqual(page.trend_chart.axis_caption, axis)
+                self.assertEqual(page.summary.cells[0].label.text(), f"Peak SIF / {unit}")
+        # The seeded reports were analysed just now: today has them all.
+        page.trend_range.buttons["today"].click()
+        self.assertEqual(page.summary.cells[3].value.text(), str(len(window.rows)))
+        self.assertFalse(page.trend_chart.smooth, "hourly counts are not a curve")
+        page.trend_range.buttons["all"].click()
+        self.assertTrue(page.trend_chart.weeks)
+
+    def test_the_spider_chart_profiles_the_trends_range(self) -> None:
+        window = self._window("reviewer")
+        self._analyse(window)
+        window.navigate("dashboard")
+        page = window.dashboard_page
+        for view, count in (("rule", 11), ("energy", 9), ("barrier", 12)):
+            with self.subTest(view):
+                page.profile_view.buttons[view].click()
+                self.assertEqual(len(page.radar.axes), count)
+        page.profile_view.buttons["rule"].click()
+        charted = sum(axis[4] for axis in page.radar.axes)
+        self.assertGreater(charted, 0)
+        sif = sum(1 for row in window.rows if row.get("sif_potential"))
+        self.assertLessEqual(sum(axis[2] for axis in page.radar.axes), sif)
+        self.assertIn(f"{len(window.rows)} report(s)", page.profile_span.text())
 
     # -- gemma2:latest, always on ------------------------------------------------------------
 
@@ -520,6 +547,80 @@ class TestSentra(unittest.TestCase):
         dash.clear_button.click()
         self.assertEqual(dash.filters, ("90", "", ""))
 
+    def _ingest(self, window, paths) -> None:
+        import time
+
+        window.stage_files(list(paths))
+        window.start_processing()
+        deadline = time.time() + 120
+        while time.time() < deadline:
+            if window.worker is not None:
+                window.worker.wait(500)
+            self.app.processEvents()
+            window.wait_for_tasks()
+            if all(item["state"] in ("done", "failed", "cancelled", "attention", "extracted")
+                   for item in window.ingest_items):
+                break
+        self.app.processEvents()
+
+    def test_a_hindi_report_is_labelled_hindi_and_read_through_a_gloss(self) -> None:
+        """It used to say 'English → English': the label came from the OCR box."""
+        samples = os.path.join(os.path.dirname(os.path.abspath(__file__)), "samples")
+        window = self._window("reviewer")
+        self.assertEqual(window.ingest_page.language.currentText(), "English",
+                         "the OCR box is left on English, as the operator had it")
+        self._ingest(window, [os.path.join(samples, "languages", "hindi_report.txt")])
+        item = window.ingest_items[0]
+        self.assertEqual(item["state"], "done")
+        self.assertEqual(item["reports"], 1, "one report form is one report")
+        self.assertEqual(item["language"], "Hindi \u00b7 keyword gloss")
+        row = window.rows[0]
+        self.assertEqual(row["source_language"], "Hindi / हिन्दी")
+        self.assertEqual(row["translated_text"], "", "a gloss is never passed off as a translation")
+        self.assertTrue(row["gloss"].startswith("Keyword gloss (not a translation):"))
+        self.assertEqual(row["site"], "Naharkatiya Rig-12")
+        self.assertTrue(row["sif_potential"])
+        self.assertIn("gloss", window.ingest_page.pipeline.cells[3].value.text())
+
+        window.navigate("review")
+        page = window.review_page
+        page.select(str(row["reference"]))
+        self.app.processEvents()
+        case = page.case
+        self.assertEqual(case.text_tag.text(), "ORIGINAL · HINDI")
+        self.assertEqual(case.original_button.text(), "Show the keyword gloss")
+        case.original_button.click()
+        self.assertIn("KEYWORD GLOSS", case.text_tag.text())
+        self.assertIn("working at height", case.text.text())
+
+    def test_the_mock_pdfs_come_through_with_their_language_and_verdict(self) -> None:
+        import glob
+
+        folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), "samples", "reports")
+        paths = sorted(glob.glob(os.path.join(folder, "*.pdf")))
+        window = self._window("reviewer")
+        self._ingest(window, paths)
+        self.assertTrue(all(item["state"] == "done" for item in window.ingest_items))
+        for item in window.ingest_items:
+            name = str(item["name"])
+            with self.subTest(name):
+                language = name.split("_")[0].title()
+                self.assertTrue(str(item["language"]).startswith(language), item["language"])
+                row = next(row for row in window.rows if row.get("source") == name)
+                self.assertEqual(bool(row["sif_potential"]), "_non_sif_" not in name)
+
+    def test_the_ingest_buttons_are_not_clipped(self) -> None:
+        window = self._window("reviewer")
+        window.resize(1440, 900)
+        window.navigate("ingest")
+        window.show()
+        page = window.ingest_page
+        page.cancel.show()
+        self.app.processEvents()
+        for button in (page.start, page.cancel, page.clear_list):
+            with self.subTest(button.text()):
+                self.assertGreaterEqual(button.width(), button.sizeHint().width())
+
     def test_dates_carry_the_zone_on_the_dashboard(self) -> None:
         window = self._window("reviewer")
         self._analyse_samples(window)
@@ -527,7 +628,9 @@ class TestSentra(unittest.TestCase):
         page = window.dashboard_page
         self.assertTrue(page.updated.text().startswith("Updated "))
         self.assertTrue(page.updated.text().endswith(" IST"))
-        self.assertIn("2026", page.trend_span.text())
+        from datetime import date
+
+        self.assertIn(str(date.today().year), page.trend_span.text())
         self.assertIn("reported", [column.key for column in page.recent_table.columns])
 
     # -- the sign-in -----------------------------------------------------------------------------

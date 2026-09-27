@@ -16,10 +16,10 @@ import math
 from typing import List, Optional, Sequence, Tuple
 
 from PyQt6.QtCore import QPointF, QRect, QRectF, Qt
-from PyQt6.QtGui import QFontMetrics, QColor, QFont, QPainter, QPainterPath, QPen
+from PyQt6.QtGui import QFontMetrics, QColor, QFont, QPainter, QPainterPath, QPen, QPolygonF
 from PyQt6.QtWidgets import QSizePolicy, QToolTip, QWidget
 
-__all__ = ["AxisBarChart", "TrendChart", "nice_ticks"]
+__all__ = ["AxisBarChart", "RadarChart", "TrendChart", "nice_ticks"]
 
 GRID = "#F0F0F0"
 TICK = "#9CA3AF"
@@ -153,6 +153,10 @@ class TrendChart(QWidget):
         self.critical: List[float] = []
         self.reports: List[float] = []
         self.reference: Optional[Tuple[float, str]] = None
+        #: Under the x axis: "Week commencing", "Hour of day", "Day", "Month".
+        self.axis_caption = "Week commencing"
+        #: Curves for weeks and months; straight lines for hourly and daily counts.
+        self.smooth = True
         self.hover = -1
         self.setMinimumHeight(240)
         self.setMouseTracking(True)
@@ -208,8 +212,9 @@ class TrendChart(QWidget):
             painter.drawText(QRectF(self.rect()), Qt.AlignmentFlag.AlignCenter,
                              "No dated reports in this period.")
             return
-        left_ticks = nice_ticks(max(self.sif + self.critical + [1]) * 1.1, 5)
-        right_ticks = nice_ticks(max(self.reports + [1]) * 1.1, 5)
+        # Counts: whole-number ticks, never "0.5 incidents".
+        left_ticks = nice_ticks(max(max(self.sif + self.critical + [1]) * 1.1, 4), 5)
+        right_ticks = nice_ticks(max(max(self.reports + [1]) * 1.1, 4), 5)
         left_top, right_top = left_ticks[-1] or 1, right_ticks[-1] or 1
 
         def y_left(value: float) -> float:
@@ -230,14 +235,18 @@ class TrendChart(QWidget):
                 painter.drawText(QRectF(plot.right() + 6, y_right(tick) - 7, 30, 14),
                                  Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
                                  _fmt(tick))
-        step = max(1, math.ceil(len(self.weeks) / 13))
+        # As many labels as fit without touching.
+        widest = max(painter.fontMetrics().horizontalAdvance(week) for week in self.weeks) + 14
+        step = max(1, math.ceil(len(self.weeks) / max(2, int(plot.width() // widest))))
+        last = len(self.weeks) - 1
         for index, week in enumerate(self.weeks):
-            if index % step == 0 or index == len(self.weeks) - 1:
+            # The last label too, unless it would sit on the one before it.
+            if index % step == 0 or (index == last and last % step >= max(1, step // 2 + 1)):
                 x = self._x(plot, index)
                 painter.drawText(QRectF(x - 30, plot.bottom() + 6, 60, 14),
                                  Qt.AlignmentFlag.AlignHCenter, week)
         painter.drawText(QRectF(plot.right() - 150, plot.bottom() + 22, 150, 14),
-                         Qt.AlignmentFlag.AlignRight, "Week commencing")
+                         Qt.AlignmentFlag.AlignRight, self.axis_caption)
         painter.save()
         painter.translate(14, plot.center().y())
         painter.rotate(-90)
@@ -279,7 +288,10 @@ class TrendChart(QWidget):
             points = [QPointF(self._x(plot, i), scale(v)) for i, v in enumerate(values)]
             painter.setPen(QPen(QColor(colour), width, style))
             painter.setBrush(Qt.BrushStyle.NoBrush)
-            painter.drawPath(self._smooth(points))
+            if self.smooth:
+                painter.drawPath(self._smooth(points))
+            else:
+                painter.drawPolyline(QPolygonF(points))
             if dots:
                 painter.setPen(Qt.PenStyle.NoPen)
                 painter.setBrush(QColor(colour))
@@ -293,6 +305,8 @@ class TrendChart(QWidget):
         for index in range(len(self.weeks)):
             x = self._x(plot, index)
             for offset, values, colour in ((-width, self.sif, self.NAVY), (0, self.critical, self.RED)):
+                if values[index] <= 0:
+                    continue          # nothing to draw - not a stub that reads as "some"
                 top = y_left(values[index])
                 bar = QRectF(x + offset, top, width, plot.bottom() - top)
                 path = QPainterPath()
@@ -320,3 +334,138 @@ class TrendChart(QWidget):
     def leaveEvent(self, _event) -> None:  # noqa: N802
         self.hover = -1
         self.update()
+
+
+class RadarChart(QWidget):
+    """A spider chart: one spoke per category, one polygon per series.
+
+    Rings at round counts, the category's short name at each spoke's end, and
+    the three series the trend draws - all reports (grey), SIF potential
+    (navy) and critical (red) - on one scale, so their shapes compare honestly.
+    Hovering near a spoke shows its full name and counts.
+    """
+
+    SERIES = (("All reports", "#9CA3AF", 40), ("SIF potential", "#1E3A5F", 70),
+              ("Critical risk", "#DC2626", 60))
+
+    def __init__(self) -> None:
+        super().__init__()
+        #: (full name, short label, sif, critical, all) per spoke.
+        self.axes: List[Tuple[str, str, int, int, int]] = []
+        self.hover = -1
+        self.setMinimumSize(300, 300)
+        self.setMouseTracking(True)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+
+    def set_axes(self, axes: Sequence[Tuple[str, str, int, int, int]]) -> None:
+        self.axes = list(axes)
+        self.hover = -1
+        self.update()
+
+    def _geometry(self) -> Tuple[QPointF, float]:
+        """The centre, and a radius that leaves room for the longest label beside it."""
+        font = QFont(self.font())
+        font.setPixelSize(11)
+        widest = max([QFontMetrics(font).horizontalAdvance(axis[1]) for axis in self.axes] + [40])
+        centre = QPointF(self.width() / 2, self.height() / 2 + 4)
+        radius = max(40.0, min(self.width() / 2 - widest - 18, self.height() / 2 - 34))
+        return centre, radius
+
+    def _point(self, centre: QPointF, radius: float, index: int, share: float) -> QPointF:
+        angle = -math.pi / 2 + 2 * math.pi * index / max(1, len(self.axes))
+        return QPointF(centre.x() + radius * share * math.cos(angle),
+                       centre.y() + radius * share * math.sin(angle))
+
+    def paintEvent(self, _event) -> None:  # noqa: N802
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        small = QFont(self.font())
+        small.setPixelSize(10)
+        painter.setFont(small)
+        if len(self.axes) < 3:
+            painter.setPen(QColor(TICK))
+            painter.drawText(QRectF(self.rect()), Qt.AlignmentFlag.AlignCenter,
+                             "Not enough categories to draw.")
+            return
+        centre, radius = self._geometry()
+        top = max([axis[4] for axis in self.axes] + [4])
+        ticks = [tick for tick in nice_ticks(top, 4) if tick > 0]
+        scale = ticks[-1] if ticks else 1
+        count = len(self.axes)
+        # Rings and spokes.
+        painter.setPen(QPen(QColor("#E5E7EB"), 1))
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        for tick in ticks:
+            ring = QPainterPath()
+            for index in range(count + 1):
+                point = self._point(centre, radius, index % count, tick / scale)
+                ring.moveTo(point) if index == 0 else ring.lineTo(point)
+            painter.drawPath(ring)
+        for index in range(count):
+            painter.drawLine(centre, self._point(centre, radius, index, 1.0))
+        painter.setPen(QColor(TICK))
+        for tick in ticks:
+            point = self._point(centre, radius, 0, tick / scale)
+            painter.drawText(QRectF(point.x() + 4, point.y() + 1, 30, 12),
+                             Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop,
+                             _fmt(tick))
+        # Series, largest first so the smaller shapes sit on top.
+        for series, (_name, colour, alpha) in zip((4, 2, 3), self.SERIES):
+            polygon = QPainterPath()
+            points = [self._point(centre, radius, index, axis[series] / scale)
+                      for index, axis in enumerate(self.axes)]
+            polygon.moveTo(points[0])
+            for point in points[1:]:
+                polygon.lineTo(point)
+            polygon.closeSubpath()
+            fill = QColor(colour)
+            fill.setAlpha(alpha)
+            painter.setBrush(fill)
+            painter.setPen(QPen(QColor(colour), 1.8 if series != 4 else 1.0,
+                                Qt.PenStyle.DashLine if series == 3 else Qt.PenStyle.SolidLine))
+            painter.drawPath(polygon)
+            if series != 4:
+                painter.setPen(Qt.PenStyle.NoPen)
+                painter.setBrush(QColor(colour))
+                for index, point in enumerate(points):
+                    size = 4.5 if index == self.hover else 2.6
+                    painter.drawEllipse(point, size, size)
+        # Labels at the spokes' ends.
+        label_font = QFont(self.font())
+        label_font.setPixelSize(11)
+        painter.setFont(label_font)
+        metrics = QFontMetrics(label_font)
+        for index, axis in enumerate(self.axes):
+            point = self._point(centre, radius + 12, index, 1.0)
+            text = axis[1]
+            width = metrics.horizontalAdvance(text) + 4
+            dx = point.x() - centre.x()
+            left = point.x() - width / 2 if abs(dx) < 8 else (point.x() if dx > 0
+                                                               else point.x() - width)
+            box = QRectF(left, point.y() - 8, width, 16)
+            painter.setPen(QColor("#10213A" if index == self.hover else LABEL))
+            painter.drawText(box, Qt.AlignmentFlag.AlignCenter, text)
+
+    def mouseMoveEvent(self, event) -> None:  # noqa: N802
+        if len(self.axes) < 3:
+            return
+        centre, radius = self._geometry()
+        dx = event.position().x() - centre.x()
+        dy = event.position().y() - centre.y()
+        if math.hypot(dx, dy) > radius + 40:
+            self.leaveEvent(None)
+            return
+        angle = (math.atan2(dy, dx) + math.pi / 2) % (2 * math.pi)
+        index = round(angle / (2 * math.pi) * len(self.axes)) % len(self.axes)
+        if index != self.hover:
+            self.hover = index
+            self.update()
+        name, _short, sif, critical, total = self.axes[index]
+        QToolTip.showText(event.globalPosition().toPoint(),
+                          f"{name}\nSIF potential: {sif}\nCritical risk: {critical}\n"
+                          f"All reports: {total}", self)
+
+    def leaveEvent(self, _event) -> None:  # noqa: N802
+        if self.hover != -1:
+            self.hover = -1
+            self.update()
