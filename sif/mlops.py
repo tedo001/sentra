@@ -469,10 +469,10 @@ class MLflowTracker:
                 "status": run.info.status,
                 "samples": run.data.params.get("samples", ""),
                 "labels": run.data.params.get("label_source", ""),
-                "f1": f'{float(run.data.metrics.get("f1", float("nan"))):.3f}'
-                      if "f1" in run.data.metrics else "",
-                "roc_auc": f'{float(run.data.metrics.get("roc_auc", float("nan"))):.3f}'
-                           if "roc_auc" in run.data.metrics else "",
+                # Every score the run logged, to three places ("" when absent).
+                **{name: f"{float(run.data.metrics[name]):.3f}"
+                   if name in run.data.metrics else ""
+                   for name in ("f1", "precision", "recall", "accuracy", "roc_auc")},
             }
             for run in runs
         ]

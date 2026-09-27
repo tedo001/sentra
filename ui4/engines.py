@@ -22,7 +22,7 @@ from PyQt6.QtWidgets import (
     QSpinBox,
 )
 
-from .kit import BarList, Card, Col, DesignTable, KeyValues, Page, Pill
+from .kit import BarList, Card, Col, DesignTable, KeyValues, Page, Pill, StatStrip
 
 __all__ = ["ENGINE_KEYS", "EngineCard", "EnginesPage", "RUN_COLUMNS"]
 
@@ -31,14 +31,19 @@ ENGINE_KEYS = (("encoder", "Semantic encoder"), ("ocr", "OCR engine"), ("llm", "
                ("tracking", "Experiment tracking"))
 
 RUN_COLUMNS = (
-    Col("run_id", "Run", 72, "mono"),
-    Col("started", "Started", 118, "mono"),
+    Col("run_id", "Run", 70, "mono"),
+    Col("started", "Started", 132, "mono"),
     Col("labels", "Labels", 0),
-    Col("samples", "Samples", 70, align="right"),
-    Col("f1", "F1", 54, align="right"),
-    Col("roc_auc", "AUC", 54, align="right"),
-    Col("state", "Status", 150, "pill"),
+    Col("samples", "Samples", 78, align="right"),
+    Col("f1", "F1", 64, "strong", align="right"),
+    Col("precision", "Precision", 84, "strong", align="right"),
+    Col("recall", "Recall", 66, align="right"),
+    Col("roc_auc", "AUC", 58, align="right"),
+    Col("state", "Status", 108, "pill"),
 )
+#: The scores shown large above the run table, for the attached (or latest) run.
+RUN_SCORES = (("f1", "F1 score"), ("precision", "Precision"), ("recall", "Recall"),
+              ("roc_auc", "ROC AUC"))
 
 
 class EngineCard(Card):
@@ -154,8 +159,19 @@ class EnginesPage(Page):
         self.runs_caption = QLabel("")
         self.runs_caption.setObjectName("CardCaption")
         self.runs.add_head(self.runs_caption)
+        # The model in use, scored: F1 and precision large, before the history.
+        self.run_scores = StatStrip(tuple(label for _key, label in RUN_SCORES))
+        self.run_scores.setObjectName("SummaryStrip")
+        self.runs.add(self.run_scores)
         self.run_table = DesignTable(RUN_COLUMNS, row_height=34)
         self.runs.add(self.run_table, 1)
+        self.runs_note = QLabel("Labels: Reviewed = HSE reviewers' decisions, so the scores are "
+                                "real accuracy. Pipeline = the engine's own verdicts "
+                                "(distillation), so 1.000 only means it copies the engine.")
+        self.runs_note.setObjectName("CardCaption")
+        self.runs_note.setWordWrap(True)
+        self.runs_note.setContentsMargins(14, 6, 14, 10)
+        self.runs.add(self.runs_note)
 
         self.importance = Card("Feature importance", "")
         self.importance_caption = QLabel("")
@@ -168,9 +184,9 @@ class EnginesPage(Page):
 
         row = QHBoxLayout()
         row.setSpacing(12)
-        row.addWidget(self.train, 30)
-        row.addWidget(self.runs, 43)
-        row.addWidget(self.importance, 25)
+        row.addWidget(self.train, 24)
+        row.addWidget(self.runs, 54)
+        row.addWidget(self.importance, 22)
         for card in (self.train, self.runs, self.importance):
             card.setMinimumHeight(330)
         self.body.addLayout(row)
@@ -188,6 +204,14 @@ class EnginesPage(Page):
     def show_runs(self, rows, caption: str) -> None:
         self.run_table.set_rows(rows)
         self.runs_caption.setText(caption)
+        # The attached run if there is one, else the newest.
+        chosen = next((row for row in rows if "attached" in str((row.get("state") or ("",))[0])
+                       .lower()), rows[0] if rows else None)
+        for cell, (key, _label) in zip(self.run_scores.cells, RUN_SCORES):
+            value = str(chosen.get(key) or "") if chosen else ""
+            note = (f"run {chosen.get('run_id', '')} · {chosen.get('labels', '')}"
+                    if chosen and value else "no run yet" if not chosen else "not logged")
+            cell.set(value or "-", note)
 
     def show_importance(self, items, caption: str) -> None:
         self.importance_bars.set_items(items)

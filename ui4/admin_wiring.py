@@ -78,6 +78,16 @@ def _short_time(value: object) -> str:
         return str(value or "")
 
 
+
+def _label_source(value: object) -> str:
+    """'Reviewed' or 'Pipeline' - which labels a training run learned from."""
+    text = str(value or "").lower()
+    if "human" in text or "review" in text:
+        return "Reviewed"
+    if "weak" in text or "pipeline" in text:
+        return "Pipeline"
+    return str(value or "-").split(" (")[0]
+
 class AdminPages:
     """Engines, Settings, SysLog, Audit Log, New HSE Login - the design's."""
 
@@ -355,10 +365,10 @@ class AdminPages:
         page.reviewed_count.setText(f"{len(labels)} available")
         page.train_button.setEnabled(self.session.can(TRAIN) and self.worker is None)
         latest = runs[0]["run_id"] if runs else ""
-        page.show_runs([{**run, "labels": str(run.get("labels", "")).split(" (")[0],
+        page.show_runs([{**run, "labels": _label_source(run.get("labels")),
                          "run_id": str(run.get("run_id", ""))[:6],
                          "started": _short_time(run.get("started")),
-                         "state": ("✓ Finished · attached", "ok")
+                         "state": ("✓ Attached", "ok")
                          if run["run_id"] == latest and attached else
                          ("Finished", "grey") if run.get("status") == "FINISHED" else
                          (str(run.get("status", "")).title(), "fail")} for run in runs],

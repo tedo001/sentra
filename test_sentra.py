@@ -151,6 +151,45 @@ class TestSentra(unittest.TestCase):
         self.assertEqual(window.pages.currentIndex(), window._page_index["data"])
         self.assertIn("SQLite", window.data_page.db_where.text())
 
+    def test_training_runs_show_f1_and_precision_large_and_in_full(self) -> None:
+        from ui4.engines import RUN_COLUMNS
+
+        self.assertIn("precision", [column.key for column in RUN_COLUMNS])
+        window = self._window("admin", "admin.person")
+        window.navigate("engines")
+        page = window.engines_page
+        rows = [dict(run_id="d4735b", started="11 Sep 04:59", labels="Reviewed", samples="10",
+                     f1="0.727", precision="0.800", recall="0.667", roc_auc="0.640",
+                     state=("✓ Attached", "ok")),
+                dict(run_id="b8a06e", started="10 Sep 11:45", labels="Pipeline", samples="5",
+                     f1="1.000", precision="1.000", recall="1.000", roc_auc="1.000",
+                     state=("Finished", "grey"))]
+        page.show_runs(rows, "MLflow")
+        scores = {cell.label.text(): cell.value.text() for cell in page.run_scores.cells}
+        self.assertEqual((scores["F1 score"], scores["Precision"]), ("0.727", "0.800"),
+                         "the attached run is the one scored, not the newest weak one")
+        self.assertEqual(page.run_table.item(0, 5).text(), "0.800")
+        page.show_runs([], "MLflow")
+        self.assertEqual(page.run_scores.cells[0].value.text(), "-")
+
+    def test_mlflow_runs_carry_precision_and_recall(self) -> None:
+        from sif.mlops import MLflowTracker, TrainingReport
+
+        tracker = MLflowTracker("sqlite:///" + os.path.join(self.folder, "mlflow.db"),
+                                "sentra-test")
+        if not tracker.installed():
+            self.skipTest("MLflow is not installed")
+        tracker.log_training(TrainingReport(
+            samples=10, positives=4, label_source="human review decisions",
+            metrics={"f1": 0.7273, "precision": 0.8, "recall": 0.6667, "roc_auc": 0.64}))
+        run = tracker.recent_runs(1)[0]
+        self.assertEqual((run["f1"], run["precision"], run["recall"], run["roc_auc"]),
+                         ("0.727", "0.800", "0.667", "0.640"))
+        from ui4.admin_wiring import _label_source
+
+        self.assertEqual(_label_source(run["labels"]), "Reviewed")
+        self.assertEqual(_label_source("weak (pipeline verdicts)"), "Pipeline")
+
     def test_the_risk_trend_runs_up_to_now_by_hour_day_or_month(self) -> None:
         window = self._window("reviewer")
         self._analyse(window)
